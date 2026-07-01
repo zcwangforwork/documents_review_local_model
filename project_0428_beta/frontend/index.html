@@ -1,0 +1,1487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>贴敷式胰岛素泵文档审核数字员工</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <style>
+        .chat-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        .chat-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+        .chat-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .message-enter {
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .typing-indicator span {
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .file-upload-zone {
+            border: 2px dashed #475569;
+            transition: all 0.3s ease;
+        }
+        .file-upload-zone:hover, .file-upload-zone.dragover {
+            border-color: #10b981;
+            background-color: rgba(16, 185, 129, 0.1);
+        }
+
+        .upload-progress {
+            transition: width 0.3s ease;
+        }
+
+        /* Markdown 渲染样式 */
+        .markdown-body h1 { font-size: 1.5em; font-weight: 700; margin: 0.8em 0 0.4em; color: #e2e8f0; border-bottom: 1px solid #334155; padding-bottom: 0.3em; }
+        .markdown-body h2 { font-size: 1.3em; font-weight: 600; margin: 0.7em 0 0.3em; color: #e2e8f0; }
+        .markdown-body h3 { font-size: 1.15em; font-weight: 600; margin: 0.6em 0 0.3em; color: #cbd5e1; }
+        .markdown-body h4 { font-size: 1.05em; font-weight: 600; margin: 0.5em 0 0.2em; color: #cbd5e1; }
+        .markdown-body p { margin: 0.4em 0; line-height: 1.6; }
+        .markdown-body ul, .markdown-body ol { margin: 0.4em 0; padding-left: 1.5em; }
+        .markdown-body li { margin: 0.2em 0; }
+        .markdown-body table { border-collapse: collapse; margin: 0.6em 0; width: 100%; }
+        .markdown-body th, .markdown-body td { border: 1px solid #475569; padding: 6px 10px; text-align: left; }
+        .markdown-body th { background: #1e293b; font-weight: 600; color: #e2e8f0; }
+        .markdown-body td { color: #cbd5e1; }
+        .markdown-body tr:nth-child(even) td { background: #1e293b; }
+        .markdown-body blockquote { border-left: 3px solid #10b981; margin: 0.5em 0; padding: 0.3em 1em; color: #94a3b8; }
+        .markdown-body code { background: #1e293b; padding: 2px 5px; border-radius: 3px; font-size: 0.9em; color: #10b981; }
+        .markdown-body pre { background: #1e293b; padding: 0.8em; border-radius: 6px; overflow-x: auto; margin: 0.5em 0; }
+        .markdown-body pre code { background: none; padding: 0; }
+        .markdown-body hr { border: none; border-top: 1px solid #334155; margin: 1em 0; }
+        .markdown-body strong { color: #f1f5f9; }
+        .markdown-body em { color: #94a3b8; }
+
+        /* 内容折叠/展开 */
+        .hidden { display: none; }
+        .expand-toggle { cursor: pointer; background: none; border: none; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 min-h-screen">
+    <div class="container mx-auto max-w-4xl px-4 py-8">
+        <!-- 标题区域 -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 mb-2">
+                贴敷式胰岛素泵文档审核数字员工
+            </h1>
+            <p class="text-slate-400 text-sm">设计开发 / 风险管理 / 软件合规 / 注册申报 / 生产质量 / 体系建设 | ISO 13485 / ISO 14971 / IEC 62304 / MDR / NMPA GMP</p>
+        </header>
+
+        <!-- 配置提示区域 -->
+        <div id="configAlert" class="hidden bg-amber-900/50 border border-amber-500/50 rounded-lg p-4 mb-6 text-amber-200">
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                </svg>
+                <div>
+                    <p class="font-medium">API Key 未配置</p>
+                    <p class="text-sm mt-1">请设置 <code class="bg-black/30 px-1 rounded">OPENAI_API_KEY</code> 环境变量后重启服务</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 状态栏 -->
+        <div id="statusBar" class="bg-slate-800/50 backdrop-blur rounded-lg p-3 mb-6 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <div id="vectorstoreIndicator" class="w-3 h-3 rounded-full bg-gray-500"></div>
+                    <span class="text-slate-400 text-sm">知识库: <span id="vectorstoreStatus">未加载</span></span>
+                </div>
+                <div class="text-slate-500 text-sm">|</div>
+                <div class="text-slate-400 text-sm">文档数: <span id="docCount">0</span></div>
+            </div>
+            <button onclick="openUploadModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-4 py-2 rounded-lg transition-colors">
+                上传体系文件
+            </button>
+        </div>
+
+        <!-- 聊天容器 -->
+        <div class="bg-slate-800/50 backdrop-blur rounded-2xl shadow-2xl border border-slate-700/50 overflow-hidden">
+            <!-- 消息展示区域 -->
+            <div id="chatContainer" class="chat-container h-[450px] overflow-y-auto p-6 space-y-4">
+                <!-- 欢迎消息 -->
+                <div class="message-enter flex gap-3">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center flex-shrink-0">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </div>
+                    <div class="bg-slate-700/50 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[80%]">
+                        <p class="text-slate-100">您好！我是贴敷式胰岛素泵文档审核数字员工，专门审核贵企业内部的各类体系文档。</p>
+                        <p class="text-slate-100 mt-2">请上传您的文档（Word/PDF），选择审核领域（设计开发/风险管理/软件合规/注册申报/生产质量/体系建设），我将结合 ISO 13485、ISO 14971、IEC 62304、MDR、NMPA GMP 等标准给出专业修改建议。</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 逐段审核进度条 -->
+            <div id="segmentProgressBar" class="hidden border-t border-slate-700/50 px-4 py-3 bg-slate-800/50">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-slate-300 text-sm font-medium">逐段审核进度</span>
+                    <span class="text-slate-400 text-sm" id="segmentProgressLabel">0/0 段</span>
+                </div>
+                <div class="bg-slate-700/50 rounded-full h-2 overflow-hidden">
+                    <div id="segmentProgressFill" class="bg-gradient-to-r from-emerald-500 to-cyan-500 h-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between items-center mt-2">
+                    <p id="segmentProgressText" class="text-slate-500 text-xs">准备开始审核...</p>
+                    <div class="flex gap-2">
+                        <button
+                            id="continueSegmentBtn"
+                            onclick="handleContinueBtnClick()"
+                            class="hidden bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white text-sm px-4 py-1.5 rounded-lg transition-colors"
+                        >
+                            继续审核下一段
+                        </button>
+                        <button
+                            id="synthesizeBtn"
+                            onclick="synthesizeSegmentReport()"
+                            class="hidden bg-amber-600/30 hover:bg-amber-500/40 text-amber-300 text-sm px-4 py-1.5 rounded-lg transition-colors border border-amber-500/30"
+                        >
+                            生成综合报告
+                        </button>
+                        <button
+                            id="segmentExportBtn"
+                            onclick="exportSegmentReview()"
+                            class="hidden bg-amber-600/30 hover:bg-amber-500/40 text-amber-300 text-sm px-4 py-1.5 rounded-lg transition-colors"
+                            title="导出当前审核结果"
+                        >
+                            导出结果
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 输入区域 -->
+            <div class="border-t border-slate-700/50 p-4 bg-slate-800/30">
+                <div class="flex gap-3">
+                    <textarea
+                        id="userInput"
+                        class="flex-1 bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 resize-none"
+                        placeholder="输入您的问题，或上传体系文件后提出审核要求..."
+                        rows="1"
+                        onkeydown="handleKeyDown(event)"
+                        oninput="autoResize(this)"
+                    ></textarea>
+                    <button
+                        id="sendBtn"
+                        onclick="sendMessage()"
+                        class="bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 disabled:from-slate-600 disabled:to-slate-600 text-white font-medium px-6 py-3 rounded-xl transition-all duration-200 flex items-center gap-2 disabled:cursor-not-allowed"
+                    >
+                        <svg id="sendIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                        </svg>
+                        <span id="sendText">发送</span>
+                    </button>
+                    <button
+                        id="exportBtn"
+                        onclick="exportReview()"
+                        class="bg-amber-600/30 hover:bg-amber-500/40 text-amber-300 p-3 rounded-xl transition-colors hidden"
+                        title="导出审核报告"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </button>
+                    <button
+                        onclick="clearChat()"
+                        class="bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 p-3 rounded-xl transition-colors"
+                        title="清空对话"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-slate-500 text-xs mt-2 text-center">按 Enter 发送，Shift + Enter 换行 | 支持拖拽上传文件</p>
+            </div>
+        </div>
+
+        <!-- 底部信息 -->
+        <footer class="text-center mt-6 text-slate-500 text-sm">
+            <p>贴敷式胰岛素泵文档审核数字员工 v3.0 | 六大领域智能审核 | 请结合法规专家意见使用审核结果</p>
+        </footer>
+    </div>
+
+    <!-- 文件上传模态框 -->
+    <div id="uploadModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-50 flex items-center justify-center">
+        <div class="bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+            <div class="p-4 border-b border-slate-700 flex items-center justify-between">
+                <h3 class="text-lg font-medium text-slate-100">上传体系文件</h3>
+                <button onclick="closeUploadModal()" class="text-slate-400 hover:text-slate-100">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6">
+                <!-- 文件拖拽区域 -->
+                <div
+                    id="dropZone"
+                    class="file-upload-zone rounded-xl p-8 text-center cursor-pointer"
+                    onclick="document.getElementById('fileInput').click()"
+                    ondragover="handleDragOver(event)"
+                    ondragleave="handleDragLeave(event)"
+                    ondrop="handleDrop(event)"
+                >
+                    <input type="file" id="fileInput" class="hidden" accept=".docx,.pdf" onchange="handleFileSelect(event)">
+                    <svg class="w-12 h-12 mx-auto text-slate-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    <p class="text-slate-300 mb-2">拖拽文件到此处，或点击选择文件</p>
+                    <p class="text-slate-500 text-sm">支持 .docx 和 .pdf 格式</p>
+                </div>
+
+                <!-- 文件信息 -->
+                <div id="fileInfo" class="hidden mt-4">
+                    <div class="bg-slate-700/50 rounded-lg p-4">
+                        <div class="flex items-center gap-3">
+                            <svg class="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            <div class="flex-1">
+                                <p id="fileName" class="text-slate-100 font-medium"></p>
+                                <p id="fileSize" class="text-slate-400 text-sm"></p>
+                            </div>
+                            <button onclick="removeFile()" class="text-slate-400 hover:text-red-400">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 处理选项 -->
+                <div id="processOptions" class="hidden mt-4">
+                    <label class="text-slate-300 text-sm mb-2 block">审核领域</label>
+                    <select id="processMode" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-100">
+                        <option value="risk_management">风险管理专项审核</option>
+                        <option value="design_dev">设计开发审核</option>
+                        <option value="software_compliance">软件合规审核</option>
+                        <option value="registration">注册申报审核</option>
+                        <option value="production_quality">生产质量审核</option>
+                        <option value="system_construction">体系建设审核</option>
+                        <option value="extract">仅提取文本</option>
+                        <option value="chat">添加到对话上下文</option>
+                    </select>
+                    <p id="processHint" class="text-slate-500 text-sm mt-2">对照ISO 14971:2019/YY/T 0316标准和知识库模板，逐条分析贴敷式胰岛素泵危害识别、风险评估、风险控制等章节</p>
+
+                    <!-- 文件类型选择（根据审核领域动态变化） -->
+                    <div id="docTypeContainer" class="mt-4">
+                        <label class="text-slate-300 text-sm mb-2 block">文件类型</label>
+                        <select id="docType" class="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-100">
+                        </select>
+                    </div>
+
+                    <!-- 审核类型详细说明 -->
+                    <div id="auditTypeHint" class="mt-3 bg-slate-700/30 rounded-lg p-3 text-sm">
+                        <p id="auditHintTitle" class="text-emerald-400 font-medium mb-1">风险管理专项审核</p>
+                        <p id="auditHintDesc" class="text-slate-400">对照ISO 14971:2019/YY/T 0316标准和知识库模板，逐条分析贴敷式胰岛素泵危害识别、风险评估、风险控制等章节，给出具体修改建议。检查过量输注、欠量输注、堵塞、电池故障等产品特有风险是否得到充分控制。</p>
+                    </div>
+                </div>
+
+                <!-- 逐段审核选项 -->
+                <div id="segmentOptions" class="hidden mt-4">
+                    <div class="bg-slate-700/30 rounded-lg p-4 border border-slate-600/50">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" id="segmentMode" class="w-4 h-4 rounded bg-slate-700 border-slate-500 text-emerald-500 focus:ring-emerald-500" onchange="toggleSegmentMode()">
+                            <div>
+                                <span class="text-slate-200 font-medium">逐段审核模式</span>
+                                <p class="text-slate-400 text-sm mt-1">每次只审核文档的一个段落（约4000字符），审核完一段后可继续下一段，适合长文档审核</p>
+                            </div>
+                        </label>
+                        <div id="segmentSizeOptions" class="hidden mt-3 pl-7">
+                            <label class="text-slate-400 text-sm">每段字符数：</label>
+                            <select id="segmentSize" class="ml-2 bg-slate-700/50 border border-slate-600 rounded px-3 py-1 text-slate-200 text-sm">
+                                <option value="2000">2000 字符（短段，快速响应）</option>
+                                <option value="4000" selected>4000 字符（推荐）</option>
+                                <option value="6000">6000 字符（长段，详细分析）</option>
+                                <option value="8000">8000 字符（超长段）</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 上传进度 -->
+                <div id="uploadProgress" class="hidden mt-4">
+                    <div class="bg-slate-700/50 rounded-full h-2 overflow-hidden">
+                        <div id="progressBar" class="upload-progress bg-gradient-to-r from-emerald-500 to-cyan-500 h-full" style="width: 0%"></div>
+                    </div>
+                    <p id="progressText" class="text-slate-400 text-sm mt-2 text-center">处理中...</p>
+                </div>
+            </div>
+            <div class="p-4 border-t border-slate-700 flex justify-end gap-3">
+                <button onclick="closeUploadModal()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-lg transition-colors">
+                    取消
+                </button>
+                <button id="uploadConfirmBtn" onclick="confirmUpload()" disabled class="bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 disabled:from-slate-600 disabled:to-slate-600 text-white px-6 py-2 rounded-lg transition-all duration-200 disabled:cursor-not-allowed">
+                    确认上传
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== 内存优化配置 =====
+        const MAX_MESSAGES = 20;        // DOM 中最多保留的消息气泡数
+        const MAX_CONTENT_LENGTH = 2000; // 单条消息最大显示字符数（超出部分折叠）
+        const MARKDOWN_PARSE_TIMEOUT = 50; // markdown 解析超时(ms)，超过则降级为纯文本
+
+        let isLoading = false;
+        let sessionId = 'session_' + Date.now();
+        let selectedFile = null;
+        let latestReviewResult = null;    // 最新审核结果（用于导出）
+        let latestReviewFilename = null;  // 最新审核文件名
+
+        // 逐段审核状态
+        let segmentState = {
+            active: false,            // 是否处于逐段审核模式
+            totalSegments: 0,         // 总段数
+            completedSegments: 0,     // 已完成段数
+            progressPct: 0,           // 进度百分比
+            filename: '',             // 审核文件名
+            auditType: '',            // 审核类型
+            accumulatedAnswer: '',    // 累积的审核文本
+            isComplete: false,        // 是否全部完成
+            autoMode: true,           // 自动连续审核（默认开启）
+            _autoTimer: null          // 自动审核定时器 ID
+        };
+
+        const chatContainer = document.getElementById('chatContainer');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const sendIcon = document.getElementById('sendIcon');
+        const sendText = document.getElementById('sendText');
+        const configAlert = document.getElementById('configAlert');
+        const uploadModal = document.getElementById('uploadModal');
+        const fileInput = document.getElementById('fileInput');
+        const dropZone = document.getElementById('dropZone');
+
+        async function init() {
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                if (!data.config.configured) {
+                    configAlert.classList.remove('hidden');
+                }
+                updateVectorstoreStatus(data);
+            } catch (e) {
+                console.error('健康检查失败:', e);
+            }
+        }
+
+        function updateVectorstoreStatus(data) {
+            const indicator = document.getElementById('vectorstoreIndicator');
+            const status = document.getElementById('vectorstoreStatus');
+            const docCount = document.getElementById('docCount');
+
+            if (data.vectorstore_loaded) {
+                indicator.classList.remove('bg-gray-500');
+                indicator.classList.add('bg-emerald-500');
+                status.textContent = '已加载';
+            } else {
+                indicator.classList.remove('bg-emerald-500');
+                indicator.classList.add('bg-amber-500');
+                status.textContent = '未加载';
+            }
+            docCount.textContent = data.document_count || 0;
+        }
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
+        }
+
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function addMessage(role, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message-enter flex gap-3';
+
+            const avatar = role === 'user'
+                ? `<div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center flex-shrink-0">
+                     <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                       <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>
+                     </svg>
+                   </div>`
+                : `<div class="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center flex-shrink-0">
+                     <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                     </svg>
+                   </div>`;
+
+            const bgClass = role === 'user'
+                ? 'bg-gradient-to-r from-blue-600/80 to-purple-600/80 rounded-2xl rounded-tr-sm'
+                : 'bg-slate-700/50 rounded-2xl rounded-tl-sm';
+
+            // 助手消息使用截断渲染（内存优化），用户消息直接显示
+            const isMarkdown = role === 'assistant';
+            const contentHtml = createTruncatedContent(content, isMarkdown);
+
+            messageDiv.innerHTML = `
+                ${avatar}
+                <div class="${bgClass} px-4 py-3 max-w-[80%] ${role === 'assistant' ? 'markdown-body' : ''}">
+                    ${contentHtml}
+                </div>
+            `;
+
+            chatContainer.appendChild(messageDiv);
+
+            // 内存优化：移除超出限制的旧消息
+            trimOldMessages();
+
+            scrollToBottom();
+        }
+
+        // 大内容分片显示：超过 MAX_CHARS 的助手消息分多条气泡展示
+        function splitAndAddMessages(role, content) {
+            const MAX_CHARS = 2000;
+            if (content.length <= MAX_CHARS) {
+                addMessage(role, content);
+                return;
+            }
+
+            // 按双换行分割段落
+            const paragraphs = content.split(/\n\n+/);
+            let currentChunk = '';
+
+            for (const para of paragraphs) {
+                if (currentChunk.length + para.length + 2 <= MAX_CHARS) {
+                    currentChunk += (currentChunk ? '\n\n' : '') + para;
+                } else {
+                    if (currentChunk) {
+                        addMessage(role, currentChunk);
+                    }
+                    // 超长段落按句子再分割
+                    if (para.length > MAX_CHARS) {
+                        const sentences = para.split(/(?<=[。！？.!?])/);
+                        let subChunk = '';
+                        for (const sent of sentences) {
+                            if (subChunk.length + sent.length <= MAX_CHARS) {
+                                subChunk += sent;
+                            } else {
+                                if (subChunk) addMessage(role, subChunk);
+                                subChunk = sent;
+                            }
+                        }
+                        if (subChunk.trim()) addMessage(role, subChunk);
+                    } else {
+                        currentChunk = para;
+                    }
+                }
+            }
+            if (currentChunk.trim()) {
+                addMessage(role, currentChunk);
+            }
+        }
+
+        function showTypingIndicator() {
+            const typingDiv = document.createElement('div');
+            typingDiv.id = 'typingIndicator';
+            typingDiv.className = 'message-enter flex gap-3';
+            typingDiv.innerHTML = `
+                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center flex-shrink-0">
+                     <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                     </svg>
+                   </div>
+                <div class="bg-slate-700/50 rounded-2xl rounded-tl-sm px-4 py-3">
+                    <div class="typing-indicator flex gap-1">
+                        <span class="w-2 h-2 bg-slate-400 rounded-full"></span>
+                        <span class="w-2 h-2 bg-slate-400 rounded-full"></span>
+                        <span class="w-2 h-2 bg-slate-400 rounded-full"></span>
+                    </div>
+                </div>
+            `;
+            chatContainer.appendChild(typingDiv);
+            scrollToBottom();
+        }
+
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) indicator.remove();
+        }
+
+        function scrollToBottom() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 内存优化：移除超出限制的旧消息
+        function trimOldMessages() {
+            const messages = chatContainer.querySelectorAll('.message-enter');
+            if (messages.length > MAX_MESSAGES) {
+                const removeCount = messages.length - MAX_MESSAGES;
+                for (let i = 0; i < removeCount; i++) {
+                    messages[i].remove();
+                }
+            }
+        }
+
+        // 安全的 markdown 解析：带超时保护，避免大内容阻塞主线程
+        function safeMarkdownParse(text) {
+            const startTime = performance.now();
+            try {
+                // 对于超大内容，不使用 markdown 解析以避免浏览器 OOM
+                if (text.length > 5000) {
+                    return `<p class="text-slate-100 whitespace-pre-wrap">${escapeHtml(text)}</p>`;
+                }
+                const rawHtml = marked.parse(text, { breaks: true });
+                // 检查解析是否超时
+                if (performance.now() - startTime > MARKDOWN_PARSE_TIMEOUT) {
+                    // 已超时，回退到纯文本
+                    throw new Error('Markdown parse timeout');
+                }
+                // DOMPurify 也可能很慢，对大 HTML 进行限制
+                if (rawHtml.length > 50000) {
+                    return `<p class="text-slate-100 whitespace-pre-wrap">${escapeHtml(text)}</p>`;
+                }
+                return DOMPurify.sanitize(rawHtml);
+            } catch (e) {
+                return `<p class="text-slate-100 whitespace-pre-wrap">${escapeHtml(text)}</p>`;
+            }
+        }
+
+        // 内存优化：内容截断 + 延迟 markdown 渲染 + "展开/收起" 切换
+        function createTruncatedContent(rawContent, isMarkdown) {
+            if (rawContent.length <= MAX_CONTENT_LENGTH) {
+                if (isMarkdown) {
+                    return safeMarkdownParse(rawContent);
+                }
+                return `<p class="text-slate-100 whitespace-pre-wrap">${escapeHtml(rawContent)}</p>`;
+            }
+
+            // 需要截断：可见部分立即渲染，隐藏部分延迟渲染
+            const visiblePart = rawContent.slice(0, MAX_CONTENT_LENGTH);
+            const hiddenPart = rawContent.slice(MAX_CONTENT_LENGTH);
+            const uniqueId = 'expand_' + Math.random().toString(36).substr(2, 9);
+
+            // 可见部分：正常渲染
+            const visibleHtml = isMarkdown
+                ? safeMarkdownParse(visiblePart)
+                : `<p class="text-slate-100 whitespace-pre-wrap">${escapeHtml(visiblePart)}</p>`;
+
+            // 隐藏部分：存储原始文本（不预渲染 markdown，点击展开时才渲染）
+            const truncatedLength = rawContent.length - MAX_CONTENT_LENGTH;
+            return `
+                <div class="truncated-content" data-hidden-text="${escapeHtml(hiddenPart)}" data-is-markdown="${isMarkdown ? '1' : '0'}" data-unique-id="${uniqueId}">
+                    <div class="visible-part">${visibleHtml}</div>
+                    <div id="${uniqueId}_hidden" class="hidden-part hidden"></div>
+                    <button
+                        class="expand-toggle mt-2 text-emerald-400 hover:text-emerald-300 text-sm font-medium focus:outline-none"
+                        onclick="toggleContent('${uniqueId}', this)"
+                        data-expanded="false"
+                    >
+                        📄 展开剩余内容 (${Math.ceil(truncatedLength / 1000)}k 字符)
+                    </button>
+                </div>
+            `;
+        }
+
+        // 展开/收起切换（延迟渲染：展开时才解析 markdown）
+        function toggleContent(uniqueId, btn) {
+            const hiddenDiv = document.getElementById(uniqueId + '_hidden');
+            const isExpanded = btn.getAttribute('data-expanded') === 'true';
+            if (isExpanded) {
+                // 收起：清空隐藏部分 DOM 以释放内存
+                hiddenDiv.innerHTML = '';
+                hiddenDiv.classList.add('hidden');
+                btn.setAttribute('data-expanded', 'false');
+                const truncatedBlock = btn.closest('.truncated-content');
+                const truncatedLen = truncatedBlock ? truncatedBlock.dataset.hiddenText.length : 0;
+                btn.innerHTML = `📄 展开剩余内容 (${Math.ceil(truncatedLen / 1000)}k 字符)`;
+            } else {
+                // 展开：延迟渲染 markdown（使用 requestAnimationFrame 避免阻塞）
+                btn.setAttribute('data-expanded', 'true');
+                btn.innerHTML = '📄 收起';
+                hiddenDiv.classList.remove('hidden');
+
+                const truncatedBlock = btn.closest('.truncated-content');
+                const hiddenText = truncatedBlock ? truncatedBlock.dataset.hiddenText : '';
+                const isMarkdown = truncatedBlock && truncatedBlock.dataset.isMarkdown === '1';
+
+                // 使用 requestAnimationFrame 分帧渲染，避免阻塞主线程
+                requestAnimationFrame(() => {
+                    const decoded = hiddenText.replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+                        .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;/g, "'");
+                    if (isMarkdown) {
+                        // 对展开内容也进行大小限制
+                        if (decoded.length > 8000) {
+                            hiddenDiv.innerHTML = `<p class="text-slate-100 whitespace-pre-wrap">${escapeHtml(decoded)}</p>`;
+                        } else {
+                            hiddenDiv.innerHTML = safeMarkdownParse(decoded);
+                        }
+                    } else {
+                        hiddenDiv.innerHTML = `<p class="text-slate-100 whitespace-pre-wrap">${escapeHtml(decoded)}</p>`;
+                    }
+                });
+            }
+        }
+
+        function setLoading(loading) {
+            isLoading = loading;
+            sendBtn.disabled = loading;
+            userInput.disabled = loading;
+
+            if (loading) {
+                sendIcon.innerHTML = '<svg class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+                sendText.textContent = '发送中...';
+            } else {
+                sendIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>';
+                sendText.textContent = '发送';
+            }
+        }
+
+        async function sendMessage() {
+            if (isLoading) return;
+
+            const content = userInput.value.trim();
+            if (!content) return;
+
+            addMessage('user', content);
+            userInput.value = '';
+            userInput.style.height = 'auto';
+
+            setLoading(true);
+            showTypingIndicator();
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: [{ role: 'user', content: content }],
+                        temperature: 0.7,
+                        max_tokens: 32000
+                    })
+                });
+
+                hideTypingIndicator();
+
+                if (!response.ok) {
+                    let errorMsg = `HTTP ${response.status}`;
+                    try {
+                        const error = await response.json();
+                        errorMsg = error.detail?.error?.message || error.detail || errorMsg;
+                        if (typeof errorMsg === 'object') errorMsg = JSON.stringify(errorMsg);
+                    } catch {
+                        errorMsg = await response.text() || errorMsg;
+                    }
+                    throw new Error(errorMsg);
+                }
+
+                let data;
+                try {
+                    data = await response.json();
+                } catch {
+                    const text = await response.text();
+                    throw new Error(`服务器返回了非 JSON 格式的响应: ${text.substring(0, 200)}`);
+                }
+                splitAndAddMessages('assistant', data.answer || '（空响应）');
+
+            } catch (error) {
+                hideTypingIndicator();
+                addMessage('assistant', `抱歉，发生了错误：${error.message}\n\n请检查 API 配置是否正确，或者稍后重试。`);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function clearChat() {
+            try {
+                await fetch(`/api/clear?session_id=${sessionId}`, { method: 'POST' });
+                // 同时重置逐段审核状态
+                const formData = new FormData();
+                formData.append('session_id', sessionId);
+                await fetch('/api/segment-reset', { method: 'POST', body: formData });
+            } catch (e) {
+                console.error('清除历史失败:', e);
+            }
+
+            chatContainer.innerHTML = `
+                <div class="message-enter flex gap-3">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center flex-shrink-0">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </div>
+                    <div class="bg-slate-700/50 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[80%]">
+                        <p class="text-slate-100">您好！我是贴敷式胰岛素泵文档审核数字员工，专门审核贵企业内部的各类体系文档。</p>
+                        <p class="text-slate-100 mt-2">请上传您的文档（Word/PDF），选择审核领域（设计开发/风险管理/软件合规/注册申报/生产质量/体系建设），我将结合 ISO 13485、ISO 14971、IEC 62304、MDR、NMPA GMP 等标准给出专业修改建议。</p>
+                    </div>
+                </div>
+            `;
+
+            sessionId = 'session_' + Date.now();
+            // 清空后隐藏导出按钮和进度条
+            document.getElementById('exportBtn').classList.add('hidden');
+            document.getElementById('segmentProgressBar').classList.add('hidden');
+            latestReviewResult = null;
+            latestReviewFilename = null;
+            // 清除自动审核定时器
+            if (segmentState._autoTimer) {
+                clearTimeout(segmentState._autoTimer);
+            }
+            // 重置逐段审核状态
+            segmentState = {
+                active: false,
+                totalSegments: 0,
+                completedSegments: 0,
+                progressPct: 0,
+                filename: '',
+                auditType: '',
+                accumulatedAnswer: '',
+                isComplete: false,
+                autoMode: true,
+                _autoTimer: null
+            };
+        }
+
+        async function exportReview() {
+            if (!latestReviewResult) {
+                alert('没有可导出的审核结果，请先上传文件进行审核。');
+                return;
+            }
+
+            const exportBtn = document.getElementById('exportBtn');
+            const originalHTML = exportBtn.innerHTML;
+            exportBtn.disabled = true;
+            exportBtn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>';
+
+            try {
+                const response = await fetch('/api/export-review', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content: latestReviewResult,
+                        filename: latestReviewFilename || '审核报告'
+                    })
+                });
+
+                if (!response.ok) {
+                    let errorMsg = '导出失败';
+                    try { const err = await response.json(); errorMsg = err.detail || errorMsg; } catch {}
+                    throw new Error(errorMsg);
+                }
+
+                // 触发浏览器下载
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const safeName = (latestReviewFilename || '审核报告').replace(/[<>:"/\\|?*]/g, '_');
+                a.download = safeName + '_审核报告.docx';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            } catch (error) {
+                alert('导出失败: ' + error.message);
+            } finally {
+                exportBtn.disabled = false;
+                exportBtn.innerHTML = originalHTML;
+            }
+        }
+
+        function openUploadModal() {
+            uploadModal.classList.remove('hidden');
+            resetUploadModal();
+        }
+
+        function closeUploadModal() {
+            uploadModal.classList.add('hidden');
+            resetUploadModal();
+        }
+
+        function resetUploadModal() {
+            selectedFile = null;
+            fileInput.value = '';
+            document.getElementById('fileInfo').classList.add('hidden');
+            document.getElementById('processOptions').classList.add('hidden');
+            document.getElementById('segmentOptions').classList.add('hidden');
+            document.getElementById('segmentSizeOptions').classList.add('hidden');
+            document.getElementById('uploadProgress').classList.add('hidden');
+            document.getElementById('uploadConfirmBtn').disabled = true;
+            document.getElementById('segmentMode').checked = false;
+            dropZone.classList.remove('dragover');
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            dropZone.classList.add('dragover');
+        }
+
+        function handleDragLeave(event) {
+            event.preventDefault();
+            dropZone.classList.remove('dragover');
+        }
+
+        function handleDrop(event) {
+            event.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        function handleFile(file) {
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (!['docx', 'pdf'].includes(ext)) {
+                alert('仅支持 .docx 和 .pdf 格式');
+                return;
+            }
+
+            selectedFile = file;
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            document.getElementById('fileInfo').classList.remove('hidden');
+            document.getElementById('processOptions').classList.remove('hidden');
+            document.getElementById('uploadConfirmBtn').disabled = false;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function removeFile() {
+            selectedFile = null;
+            fileInput.value = '';
+            document.getElementById('fileInfo').classList.add('hidden');
+            document.getElementById('processOptions').classList.add('hidden');
+            document.getElementById('uploadConfirmBtn').disabled = true;
+        }
+
+        // 六大领域审核说明映射
+        const AUDIT_HINTS = {
+            risk_management: {
+                title: '风险管理专项审核',
+                hint: '对照ISO 14971:2019/YY/T 0316标准和知识库模板，逐条分析贴敷式胰岛素泵危害识别、风险评估、风险控制等章节。检查过量输注、欠量输注、堵塞、电池故障、蓝牙中断等产品特有风险是否得到充分控制。',
+                color: 'text-emerald-400'
+            },
+            design_dev: {
+                title: '设计开发审核',
+                hint: '对照ISO 13485:2016 7.3条款，审核DHF完整性、设计输入/输出追溯性、设计验证/确认充分性。特别关注药液输送精度设计、电气安全设计、软件架构设计和人因工程设计。',
+                color: 'text-blue-400'
+            },
+            software_compliance: {
+                title: '软件合规审核',
+                hint: '对照IEC 62304/YY/T 0664，审核软件安全分级、SDP/SRS/SADD/测试文档的完整性。特别关注固件控制算法安全、蓝牙通信协议可靠性、移动APP合规、OTA升级风控和网络安全。',
+                color: 'text-purple-400'
+            },
+            registration: {
+                title: '注册申报审核',
+                hint: '对照NMPA《胰岛素泵注册审查指导原则》和MDR 2017/745，审核技术文档、临床评价报告(CER)、说明书标签、生物相容性评价等注册申报资料的完整性和合规性。',
+                color: 'text-green-400'
+            },
+            production_quality: {
+                title: '生产质量审核',
+                hint: '对照NMPA GMP和ISO 13485 7.5，审核洁净车间管理、工艺验证(IQ/OQ/PQ)、批生产记录、灭菌验证、来料检验、成品检验等生产质量文档的合规性。',
+                color: 'text-orange-400'
+            },
+            system_construction: {
+                title: '体系建设审核',
+                hint: '对照ISO 13485:2016全条款，审核质量手册、程序文件、CAPA、内审、管理评审、不良事件报告、PMS等体系文件的完整性和层次结构。',
+                color: 'text-yellow-400'
+            },
+            extract: {
+                title: '',
+                hint: '仅提取文档文本内容，不进行审核分析',
+                color: ''
+            },
+            chat: {
+                title: '',
+                hint: '将文档添加到对话上下文，可在对话中进行讨论',
+                color: ''
+            }
+        };
+
+        // 六大领域对应的文件类型映射（基于DHF清单扩充，覆盖设计控制全生命周期）
+        const DOC_TYPES = {
+            risk_management: [
+                { value: 'rm_plan', label: '风险管理计划' },
+                { value: 'hazard_id', label: '危害识别报告' },
+                { value: 'prelim_risk_analysis', label: '初步风险分析' },
+                { value: 'risk_analysis', label: '风险分析报告 (FMEA)' },
+                { value: 'risk_control', label: '风险控制方案' },
+                { value: 'risk_analysis_table', label: '产品风险分析和管理总表' },
+                { value: 'cybersec_risk_table', label: '网络安全风险分析和管理总表' },
+                { value: 'dfmea', label: 'DFMEA设计失效模式与影响分析' },
+                { value: 'residual_risk', label: '剩余风险评价报告' },
+                { value: 'rm_report', label: '风险管理报告' },
+                { value: 'other_rm', label: '其他风险管理文件' },
+            ],
+            design_dev: [
+                { value: 'dd_plan', label: '项目开发计划书' },
+                { value: 'market_research', label: '市场调研与产品定义' },
+                { value: 'feasibility_report', label: '项目可行性研究报告' },
+                { value: 'patent_analysis', label: '专利分析报告' },
+                { value: 'project_approval', label: '立项及评审记录' },
+                { value: 'registration_strategy', label: '注册路径策略' },
+                { value: 'user_requirements', label: '用户需求' },
+                { value: 'design_input', label: '设计输入文件' },
+                { value: 'hardware_req', label: '硬件设计需求' },
+                { value: 'structure_req', label: '结构设计需求' },
+                { value: 'sw_design_req', label: '软件设计需求' },
+                { value: 'packaging_req', label: '包装及标识设计需求' },
+                { value: 'product_rtm', label: '产品需求追溯矩阵(RTM)' },
+                { value: 'design_output', label: '设计输出文件' },
+                { value: 'hardware_design', label: '硬件设计方案' },
+                { value: 'structure_design', label: '结构设计方案' },
+                { value: 'sw_design', label: '软件设计方案' },
+                { value: 'sw_coding_std', label: '软件编码规范' },
+                { value: 'packaging_design', label: '包装及标识设计方案' },
+                { value: 'packaging_material', label: '初包装材料选择与确认报告' },
+                { value: 'design_output_checklist', label: '设计输出清单' },
+                { value: 'bom', label: 'BOM表/物料清单' },
+                { value: 'material_spec', label: '物料规格书/图纸' },
+                { value: 'product_drawings', label: '产品图纸(总装图/爆炸图/零件图/原理图)' },
+                { value: 'equipment_list', label: '生产检验设备清单及验证SOP' },
+                { value: 'tooling_drawings', label: '工装图纸及验收记录' },
+                { value: 'inspection_specs', label: '检验规范(进货/过程/出厂)' },
+                { value: 'production_wi', label: '生产工艺作业指导书' },
+                { value: 'sw_version_pkg', label: '软件版本包' },
+                { value: 'design_verif_plan', label: '设计验证计划' },
+                { value: 'design_verif', label: '设计验证方案/报告' },
+                { value: 'performance_verif', label: '性能验证方案/报告' },
+                { value: 'infusion_accuracy_verif', label: '输注准确性性能验证' },
+                { value: 'packaging_verif', label: '包装及标识验证方案/报告' },
+                { value: 'service_life_verif', label: '使用期限验证方案/报告' },
+                { value: 'shelf_life_verif', label: '货架有效期验证方案/报告' },
+                { value: 'transport_verif', label: '包装运输验证方案/报告' },
+                { value: 'leachable_test', label: '可沥滤物测试方案/报告' },
+                { value: 'design_transfer_plan', label: '设计转换计划' },
+                { value: 'design_transfer', label: '设计转换文件' },
+                { value: 'design_transfer_report', label: '设计转换报告' },
+                { value: 'design_valid', label: '设计确认方案/报告' },
+                { value: 'clinical_trial', label: '临床试验方案/报告' },
+                { value: 'usability_test', label: '可用性测试方案/报告' },
+                { value: 'design_review', label: '设计评审记录' },
+                { value: 'design_change', label: '设计变更记录' },
+                { value: 'product_tech_req', label: '产品技术要求' },
+                { value: 'test_method_valid', label: '检验方法学验证方案/报告' },
+                { value: 'performance_research', label: '性能研究相关记录' },
+                { value: 'qualified_supplier_list', label: '合格供应商清单' },
+                { value: 'supplier_qualification', label: '供应商资质及审核报告' },
+                { value: 'other_dd', label: '其他设计开发文件' },
+            ],
+            software_compliance: [
+                { value: 'sdp', label: '软件开发计划(SDP)' },
+                { value: 'srs', label: '软件需求规格(SRS)' },
+                { value: 'sadd', label: '软件架构设计文档(SADD)' },
+                { value: 'sddd', label: '软件详细设计文档(SDDD)' },
+                { value: 'sw_test', label: '软件单元测试方案/报告' },
+                { value: 'sw_integration_test', label: '软件集成测试方案/报告' },
+                { value: 'sw_system_test', label: '软件系统测试方案/报告' },
+                { value: 'sw_quality_test', label: '软件质量测试方案/报告' },
+                { value: 'scm_plan', label: '软件配置管理计划(SCMP)' },
+                { value: 'sw_pr_report', label: '软件问题解决报告' },
+                { value: 'sw_maint', label: '软件维护计划' },
+                { value: 'soup_mgmt', label: 'SOUP/OTS管理记录' },
+                { value: 'cybersec', label: '网络安全文档' },
+                { value: 'cybersec_test', label: '网络安全测试方案/报告' },
+                { value: 'sw_interface_cybersec_test', label: '软件接口网络安全测试方案/报告' },
+                { value: 'sw_trace_matrix', label: '软件开发追溯表/软件需求追溯矩阵' },
+                { value: 'cybersec_trace', label: '网络安全追溯表' },
+                { value: 'other_sw', label: '其他软件合规文件' },
+            ],
+            registration: [
+                { value: 'ep_checklist', label: '医疗器械安全和性能基本原则(EP)清单' },
+                { value: 'tech_req', label: '产品技术要求' },
+                { value: 'overview', label: '综述资料' },
+                { value: 'research', label: '研究资料' },
+                { value: 'cer', label: '临床评价报告(CER)' },
+                { value: 'ifu_label', label: '产品说明书/标签' },
+                { value: 'biocomp', label: '生物相容性评价报告' },
+                { value: 'sterile_valid', label: '灭菌验证报告' },
+                { value: 'stability', label: '稳定性研究报告/加速老化报告' },
+                { value: 'third_party_biocomp', label: '生物相容性/药液相容性试验报告(第三方)' },
+                { value: 'third_party_emc', label: '安规/EMC/环境可靠性检测报告(第三方)' },
+                { value: 'third_party_reg_test', label: '注册检验报告(第三方)' },
+                { value: 'other_reg', label: '其他注册申报文件' },
+            ],
+            production_quality: [
+                { value: 'process_flow', label: '工艺流程图' },
+                { value: 'iq_oq_pq', label: '工艺验证方案/报告(IQ/OQ/PQ)' },
+                { value: 'process_valid_plan', label: '工艺验证计划' },
+                { value: 'bmr', label: '批生产记录(BMR)' },
+                { value: 'incoming_insp', label: '来料检验标准' },
+                { value: 'final_insp', label: '成品检验标准' },
+                { value: 'equipment_mgmt', label: '设备管理文件' },
+                { value: 'supplier_mgmt', label: '供应商管理文件' },
+                { value: 'sterile_batch', label: '灭菌批记录' },
+                { value: 'sterilization_valid', label: '灭菌确认方案/报告' },
+                { value: 'sterilization_process_valid', label: '灭菌工艺验证方案/报告' },
+                { value: 'tooling_acceptance', label: '工装验收记录' },
+                { value: 'production_inspection_sop', label: '生产/检验SOP' },
+                { value: 'udi_mgmt', label: 'UDI标识管理文件' },
+                { value: 'other_pq', label: '其他生产质量文件' },
+            ],
+            system_construction: [
+                { value: 'quality_manual', label: '质量手册' },
+                { value: 'procedure_doc', label: '程序文件' },
+                { value: 'work_instruction', label: '作业指导书' },
+                { value: 'record_form', label: '记录表单' },
+                { value: 'design_control_procedure', label: '设计控制程序' },
+                { value: 'risk_mgmt_procedure', label: '风险管理程序' },
+                { value: 'sw_dev_procedure', label: '软件开发程序' },
+                { value: 'internal_audit', label: '内审计划/报告' },
+                { value: 'mgmt_review', label: '管理评审报告' },
+                { value: 'capa_record', label: 'CAPA记录' },
+                { value: 'training_record', label: '培训记录' },
+                { value: 'pms_plan', label: '上市后监督计划(PMS)' },
+                { value: 'document_control', label: '文件控制程序' },
+                { value: 'other_sc', label: '其他体系建设文件' },
+            ],
+        };
+
+        function updateDocTypeOptions(auditType) {
+            const docTypeSelect = document.getElementById('docType');
+            const docTypeContainer = document.getElementById('docTypeContainer');
+            const types = DOC_TYPES[auditType];
+
+            if (!types) {
+                docTypeContainer.classList.add('hidden');
+                return;
+            }
+
+            docTypeContainer.classList.remove('hidden');
+            docTypeSelect.innerHTML = types.map(t =>
+                `<option value="${t.value}">${t.label}</option>`
+            ).join('');
+        }
+
+        document.getElementById('processMode').addEventListener('change', function() {
+            const hint = document.getElementById('processHint');
+            const auditHint = document.getElementById('auditTypeHint');
+            const hintTitle = document.getElementById('auditHintTitle');
+            const hintDesc = document.getElementById('auditHintDesc');
+            const docTypeContainer = document.getElementById('docTypeContainer');
+            const info = AUDIT_HINTS[this.value] || AUDIT_HINTS['risk_management'];
+
+            hint.textContent = info.hint;
+
+            if (this.value === 'extract' || this.value === 'chat') {
+                auditHint.classList.add('hidden');
+                docTypeContainer.classList.add('hidden');
+                document.getElementById('segmentOptions').classList.add('hidden');
+            } else {
+                auditHint.classList.remove('hidden');
+                hintTitle.textContent = info.title;
+                hintTitle.className = info.color + ' font-medium mb-1';
+                hintDesc.textContent = info.hint;
+                // 更新文件类型下拉菜单
+                updateDocTypeOptions(this.value);
+                // 显示逐段审核选项
+                document.getElementById('segmentOptions').classList.remove('hidden');
+            }
+        });
+
+        function toggleSegmentMode() {
+            const checked = document.getElementById('segmentMode').checked;
+            const sizeOptions = document.getElementById('segmentSizeOptions');
+            if (checked) {
+                sizeOptions.classList.remove('hidden');
+            } else {
+                sizeOptions.classList.add('hidden');
+            }
+        }
+
+        // 页面加载时初始化文件类型下拉菜单
+        updateDocTypeOptions('risk_management');
+
+        async function confirmUpload() {
+            if (!selectedFile) return;
+
+            const processMode = document.getElementById('processMode').value;
+            const isSegmentMode = document.getElementById('segmentMode').checked;
+            document.getElementById('uploadProgress').classList.remove('hidden');
+            document.getElementById('uploadConfirmBtn').disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+                formData.append('session_id', sessionId);
+
+                let endpoint = '/api/upload';
+                let auditType = 'risk_management';
+
+                // 六大审核领域
+                const AUDIT_MODES = ['risk_management', 'design_dev', 'software_compliance',
+                    'registration', 'production_quality', 'system_construction'];
+
+                if (AUDIT_MODES.includes(processMode)) {
+                    auditType = processMode;
+                    if (isSegmentMode) {
+                        // 逐段审核模式
+                        const segSize = document.getElementById('segmentSize').value;
+                        endpoint = `/api/analyze-segment?segment_size=${encodeURIComponent(segSize)}`;
+                        formData.append('action', 'start');
+                        formData.append('audit_type', auditType);
+                        formData.append('segment_size', segSize);
+                        const docType = document.getElementById('docType').value;
+                        if (docType) formData.append('doc_type', docType);
+                    } else {
+                        // 传统一次性审核模式
+                        endpoint = '/api/analyze';
+                        formData.append('audit_type', auditType);
+                        const docType = document.getElementById('docType').value;
+                        if (docType) formData.append('doc_type', docType);
+                    }
+                }
+
+                const progressBar = document.getElementById('progressBar');
+                const progressText = document.getElementById('progressText');
+
+                progressBar.style.width = '30%';
+                progressText.textContent = '上传中...';
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                progressBar.style.width = '70%';
+                progressText.textContent = '处理中...';
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || '上传失败');
+                }
+
+                const data = await response.json();
+                progressBar.style.width = '100%';
+                progressText.textContent = '完成！';
+
+                setTimeout(() => {
+                    const fileName = selectedFile ? selectedFile.name : '未知文件';
+                    closeUploadModal();
+
+                    if (AUDIT_MODES.includes(processMode) && isSegmentMode) {
+                        // ===== 逐段审核模式 =====
+                        handleSegmentStartResponse(data, fileName, auditType);
+                    } else if (AUDIT_MODES.includes(processMode)) {
+                        // ===== 传统一次性审核 =====
+                        const auditLabels = {
+                            risk_management: '风险管理专项审核',
+                            design_dev: '设计开发审核',
+                            software_compliance: '软件合规审核',
+                            registration: '注册申报审核',
+                            production_quality: '生产质量审核',
+                            system_construction: '体系建设审核'
+                        };
+                        const auditTypeText = auditLabels[processMode] || '体系审核';
+                        addMessage('user', `请进行${auditTypeText}: ${fileName}`);
+                        if (data.answer) {
+                            latestReviewResult = data.answer;
+                            latestReviewFilename = fileName;
+                            document.getElementById('exportBtn').classList.remove('hidden');
+                            splitAndAddMessages('assistant', data.answer);
+                            if (data.retrieved_docs && data.retrieved_docs.length > 0) {
+                                const docsList = data.retrieved_docs.map((doc, i) =>
+                                    `${i + 1}. ${doc.source}`
+                                ).join('\n');
+                                setTimeout(() => {
+                                    addMessage('assistant', `📚 参考的知识库文档：\n${docsList}`);
+                                }, 600);
+                            }
+                        } else {
+                            addMessage('assistant', `文件 ${fileName} 已上传并分析完成。请查看审核结果。`);
+                        }
+                    } else if (processMode === 'extract') {
+                        addMessage('assistant', `文件 ${fileName} 已提取文本，长度: ${data.text_length} 字符。\n\n预览：\n${data.text_preview.slice(0, 500)}...`);
+                    } else {
+                        addMessage('assistant', `文件 ${fileName} 已添加到对话上下文（${data.text_length} 字符）。请问您想如何处理这个文件？`);
+                    }
+                }, 500);
+
+            } catch (error) {
+                alert('上传失败: ' + error.message);
+                document.getElementById('uploadProgress').classList.add('hidden');
+                document.getElementById('uploadConfirmBtn').disabled = false;
+            }
+        }
+
+        // ===== 逐段审核相关函数 =====
+        function handleSegmentStartResponse(data, fileName, auditType) {
+            // 更新逐段审核状态
+            segmentState.active = true;
+            segmentState.totalSegments = data.total_segments;
+            segmentState.completedSegments = data.segment_index;
+            segmentState.progressPct = data.progress.progress_pct;
+            segmentState.filename = fileName;
+            segmentState.auditType = auditType;
+            segmentState.accumulatedAnswer = '';
+            segmentState.isComplete = data.progress.is_complete;
+
+            // 显示进度条
+            showSegmentProgress();
+
+            // 显示第一条审核消息
+            const auditLabels = {
+                risk_management: '风险管理专项审核',
+                design_dev: '设计开发审核',
+                software_compliance: '软件合规审核',
+                registration: '注册申报审核',
+                production_quality: '生产质量审核',
+                system_construction: '体系建设审核'
+            };
+            const auditTypeText = auditLabels[auditType] || '体系审核';
+            addMessage('user', `请进行${auditTypeText}（逐段审核）: ${fileName}`);
+
+            // 显示第一段审核结果
+            const segInfo = `📋 **第 ${data.segment_index}/${data.total_segments} 段** (字符 ${data.start_pos}-${data.end_pos}，进度 ${data.progress.progress_pct}%)`;
+            splitAndAddMessages('assistant', segInfo + '\n\n' + data.segment_answer);
+            segmentState.accumulatedAnswer += `## 第 ${data.segment_index} 段 (字符 ${data.start_pos}-${data.end_pos})\n\n${data.segment_answer}\n\n---\n\n`;
+
+            // 显示参考资料
+            if (data.retrieved_docs && data.retrieved_docs.length > 0) {
+                const docsList = data.retrieved_docs.map((doc, i) =>
+                    `${i + 1}. ${doc.source}`
+                ).join('\n');
+                setTimeout(() => {
+                    addMessage('assistant', `📚 参考知识库文档：\n${docsList}`);
+                }, 600);
+            }
+
+            updateSegmentProgressUI(data);
+
+            // 检查是否已经全部完成
+            if (data.progress.is_complete) {
+                handleSegmentComplete();
+            } else if (segmentState.autoMode) {
+                // 自动审核下一段（800ms 延迟让用户看到当前段结果）
+                segmentState._autoTimer = setTimeout(() => continueSegmentReview(), 800);
+                document.getElementById('continueSegmentBtn').textContent = '停止自动审核';
+            }
+        }
+
+        async function continueSegmentReview() {
+            if (!segmentState.active || isLoading) return;
+
+            setLoading(true);
+            showTypingIndicator();
+
+            const continueBtn = document.getElementById('continueSegmentBtn');
+            continueBtn.disabled = true;
+            continueBtn.textContent = '审核中...';
+
+            try {
+                const formData = new FormData();
+                formData.append('session_id', sessionId);
+                formData.append('action', 'continue');
+                formData.append('audit_type', segmentState.auditType);
+
+                const response = await fetch('/api/analyze-segment', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                hideTypingIndicator();
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || '请求失败');
+                }
+
+                const data = await response.json();
+
+                if (data.action === 'complete') {
+                    // 全部完成
+                    addMessage('assistant', '✅ 文档已全部审核完成！请点击「生成综合报告」获取完整审核报告。');
+                    segmentState.isComplete = true;
+                    segmentState.progressPct = 100;
+                    segmentState._autoTimer = null;
+                    updateSegmentProgressUI(data);
+                    handleSegmentComplete();
+                    return;
+                }
+
+                // 显示新段落审核结果
+                const segInfo = `📋 **第 ${data.segment_index}/${data.total_segments} 段** (字符 ${data.start_pos}-${data.end_pos}，进度 ${data.progress.progress_pct}%)`;
+                splitAndAddMessages('assistant', segInfo + '\n\n' + data.segment_answer);
+                segmentState.accumulatedAnswer += `## 第 ${data.segment_index} 段 (字符 ${data.start_pos}-${data.end_pos})\n\n${data.segment_answer}\n\n---\n\n`;
+
+                // 更新状态
+                segmentState.completedSegments = data.segment_index;
+                segmentState.progressPct = data.progress.progress_pct;
+                segmentState.isComplete = data.progress.is_complete;
+
+                updateSegmentProgressUI(data);
+
+                if (data.progress.is_complete) {
+                    handleSegmentComplete();
+                } else if (segmentState.autoMode) {
+                    // 自动审核下一段（800ms 延迟让用户看到当前段结果）
+                    segmentState._autoTimer = setTimeout(() => continueSegmentReview(), 800);
+                }
+            } catch (error) {
+                hideTypingIndicator();
+                // 出错时停止自动审核
+                if (segmentState._autoTimer) {
+                    clearTimeout(segmentState._autoTimer);
+                    segmentState._autoTimer = null;
+                }
+                addMessage('assistant', `❌ 审核失败: ${error.message}`);
+            } finally {
+                setLoading(false);
+                if (segmentState._autoTimer) {
+                    continueBtn.textContent = '停止自动审核';
+                } else {
+                    continueBtn.textContent = '继续审核下一段';
+                }
+                continueBtn.disabled = false;
+            }
+        }
+
+        // 继续/停止按钮点击处理：自动模式下停止，手动模式下继续
+        function handleContinueBtnClick() {
+            if (segmentState._autoTimer) {
+                // 停止自动审核
+                clearTimeout(segmentState._autoTimer);
+                segmentState._autoTimer = null;
+                segmentState.autoMode = false;
+                const btn = document.getElementById('continueSegmentBtn');
+                btn.textContent = '继续审核下一段';
+            } else {
+                // 手动继续（重新开启自动模式）
+                segmentState.autoMode = true;
+                continueSegmentReview();
+            }
+        }
+
+        async function synthesizeSegmentReport() {
+            if (!segmentState.active || isLoading) return;
+
+            setLoading(true);
+            showTypingIndicator();
+            document.getElementById('synthesizeBtn').disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('session_id', sessionId);
+
+                const response = await fetch('/api/segment-synthesize', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                hideTypingIndicator();
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || '综合报告生成失败');
+                }
+
+                const data = await response.json();
+
+                // 显示综合报告
+                addMessage('user', `请生成综合审核报告: ${segmentState.filename}`);
+                splitAndAddMessages('assistant', data.full_report);
+
+                // 保存用于导出
+                latestReviewResult = data.full_report;
+                latestReviewFilename = segmentState.filename;
+                document.getElementById('exportBtn').classList.remove('hidden');
+
+                // 隐藏综合报告按钮
+                document.getElementById('synthesizeBtn').classList.add('hidden');
+                document.getElementById('segmentExportBtn').classList.remove('hidden');
+
+            } catch (error) {
+                hideTypingIndicator();
+                addMessage('assistant', `❌ 综合报告生成失败: ${error.message}`);
+            } finally {
+                setLoading(false);
+                document.getElementById('synthesizeBtn').disabled = false;
+            }
+        }
+
+        function exportSegmentReview() {
+            latestReviewResult = segmentState.accumulatedAnswer;
+            latestReviewFilename = segmentState.filename;
+            document.getElementById('exportBtn').classList.remove('hidden');
+            exportReview();
+        }
+
+        function handleSegmentComplete() {
+            // 清除自动审核定时器
+            if (segmentState._autoTimer) {
+                clearTimeout(segmentState._autoTimer);
+                segmentState._autoTimer = null;
+            }
+            // 隐藏继续按钮，显示综合报告按钮
+            document.getElementById('continueSegmentBtn').classList.add('hidden');
+            document.getElementById('synthesizeBtn').classList.remove('hidden');
+            document.getElementById('segmentExportBtn').classList.remove('hidden');
+            document.getElementById('segmentProgressText').textContent = '全部段落审核完成！可生成综合报告';
+        }
+
+        function showSegmentProgress() {
+            document.getElementById('segmentProgressBar').classList.remove('hidden');
+            document.getElementById('continueSegmentBtn').classList.remove('hidden');
+            document.getElementById('synthesizeBtn').classList.add('hidden');
+            document.getElementById('segmentExportBtn').classList.add('hidden');
+        }
+
+        function updateSegmentProgressUI(data) {
+            const progress = data.progress;
+            document.getElementById('segmentProgressFill').style.width = progress.progress_pct + '%';
+            document.getElementById('segmentProgressLabel').textContent =
+                `${progress.segments_completed}/${progress.total_segments} 段`;
+            document.getElementById('segmentProgressText').textContent =
+                `已完成 ${progress.segments_completed}/${progress.total_segments} 段 (${progress.progress_pct}%)`;
+
+            if (progress.is_complete) {
+                document.getElementById('continueSegmentBtn').classList.add('hidden');
+            } else {
+                document.getElementById('continueSegmentBtn').classList.remove('hidden');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>对话式文档审核 Agent — 贴敷式胰岛素泵体系文件智能审核</title>
+<style>
+  :root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #21262d;
+    --border: #30363d;
+    --text-primary: #c9d1d9;
+    --text-secondary: #8b949e;
+    --accent: #58a6ff;
+    --accent-green: #3fb950;
+    --accent-orange: #d2991d;
+    --accent-red: #f85149;
+    --accent-purple: #a371f7;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    line-height: 1.6;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header */
+  .header {
+    display: flex; align-items: center; gap: 16px;
+    padding: 12px 24px; background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+  }
+  .header .logo { font-size: 18px; font-weight: 700; }
+  .header .logo .agent-badge {
+    display: inline-block; background: var(--accent-purple);
+    color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 10px;
+    margin-left: 8px; vertical-align: middle;
+  }
+  .header .nav { margin-left: auto; display: flex; gap: 12px; }
+  .header .nav a {
+    color: var(--text-secondary); text-decoration: none;
+    padding: 6px 12px; border-radius: 6px; font-size: 14px;
+  }
+  .header .nav a:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+  .header .nav a.active { color: var(--accent); background: var(--bg-tertiary); }
+
+  /* Progress bar */
+  .progress-bar-wrap {
+    background: var(--bg-secondary); border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+  }
+  .progress-stages {
+    display: flex; justify-content: space-between; position: relative;
+    max-width: 1000px; margin: 0 auto;
+  }
+  .progress-stages::before {
+    content: ''; position: absolute; top: 12px; left: 0; right: 0;
+    height: 2px; background: var(--border); z-index: 0;
+  }
+  .progress-stage {
+    position: relative; z-index: 1; display: flex; flex-direction: column;
+    align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary);
+    cursor: default;
+  }
+  .progress-stage .dot {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--bg-tertiary); border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; transition: all 0.3s;
+  }
+  .progress-stage.active .dot {
+    background: var(--accent-purple); border-color: var(--accent-purple);
+    color: #fff; box-shadow: 0 0 8px rgba(163,113,247,0.4);
+  }
+  .progress-stage.done .dot {
+    background: var(--accent-green); border-color: var(--accent-green);
+    color: #fff;
+  }
+  .progress-stage.active { color: var(--accent-purple); font-weight: 600; }
+  .progress-stage.done { color: var(--accent-green); }
+  .progress-stage .label { text-align: center; max-width: 70px; line-height: 1.3; }
+
+  /* Main chat area */
+  .chat-container {
+    flex: 1; display: flex; flex-direction: column;
+    max-width: 900px; width: 100%; margin: 0 auto;
+    overflow: hidden;
+  }
+  .chat-messages {
+    flex: 1; overflow-y: auto; padding: 16px 24px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .chat-messages:empty::after {
+    content: '上传文档开始对话式审核';
+    display: flex; align-items: center; justify-content: center;
+    height: 200px; color: var(--text-secondary);
+  }
+
+  /* Message bubbles */
+  .msg { display: flex; gap: 10px; max-width: 85%; animation: fadeIn 0.3s; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .msg.agent { align-self: flex-start; }
+  .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+  .msg .avatar {
+    width: 32px; height: 32px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; font-size: 16px;
+    flex-shrink: 0;
+  }
+  .msg.agent .avatar { background: var(--accent-purple); }
+  .msg.user .avatar { background: var(--accent); }
+  .msg .bubble {
+    padding: 10px 14px; border-radius: 12px; font-size: 14px;
+    line-height: 1.7; word-wrap: break-word; overflow-wrap: break-word;
+  }
+  .msg.agent .bubble {
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-top-left-radius: 4px;
+  }
+  .msg.user .bubble {
+    background: var(--accent-purple); color: #fff;
+    border-top-right-radius: 4px;
+  }
+  .msg.system .bubble {
+    background: rgba(248,81,73,0.1); border: 1px solid rgba(248,81,73,0.3);
+    color: var(--accent-red); font-size: 13px; align-self: center;
+  }
+
+  /* Chat markdown */
+  .msg .bubble h1, .msg .bubble h2, .msg .bubble h3, .msg .bubble h4 {
+    margin: 8px 0 4px; line-height: 1.4;
+  }
+  .msg .bubble h1 { font-size: 20px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  .msg .bubble h2 { font-size: 17px; }
+  .msg .bubble h3 { font-size: 15px; }
+  .msg .bubble p { margin: 4px 0; }
+  .msg .bubble ul, .msg .bubble ol { padding-left: 20px; margin: 4px 0; }
+  .msg .bubble li { margin: 2px 0; }
+  .msg .bubble code {
+    background: var(--bg-tertiary); padding: 2px 6px; border-radius: 3px;
+    font-size: 13px;
+  }
+  .msg .bubble pre {
+    background: var(--bg-primary); padding: 10px; border-radius: 6px;
+    overflow-x: auto; font-size: 12px; margin: 6px 0;
+  }
+  .msg .bubble pre code { background: none; padding: 0; }
+  .msg .bubble blockquote {
+    border-left: 3px solid var(--accent); padding-left: 10px;
+    color: var(--text-secondary); margin: 4px 0;
+  }
+  .msg .bubble table { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 13px; }
+  .msg .bubble td, .msg .bubble th {
+    border: 1px solid var(--border); padding: 4px 8px; text-align: left;
+  }
+  .msg .bubble th { background: var(--bg-tertiary); }
+  .msg .bubble strong { color: #fff; }
+  .msg .bubble hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+
+  /* Streaming bubble: blinking caret to indicate live token rendering */
+  .msg.streaming .bubble::after {
+    content: '▋';
+    display: inline-block;
+    margin-left: 2px;
+    animation: blink 0.9s steps(2, start) infinite;
+    color: var(--accent-purple);
+  }
+  @keyframes blink { to { visibility: hidden; } }
+
+  /* Phase 2.5: checkpoint 结构化卡片 */
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 6px 0;
+    background: rgba(0,0,0,0.02);
+  }
+  .card-title { font-weight: 600; margin-bottom: 6px; font-size: 14px; }
+  .card-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; font-size: 13px; }
+  .card-stats span { padding: 2px 0; }
+  .card-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .card-table th, .card-table td {
+    border-bottom: 1px solid var(--border);
+    padding: 4px 6px;
+    text-align: left;
+  }
+  .card-table th { font-weight: 600; background: rgba(0,0,0,0.03); }
+  .badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    line-height: 1.6;
+    background: #eee;
+    color: #333;
+  }
+  .badge.depth-deep { background: #ffe0e0; color: #b00; }
+  .badge.depth-standard { background: #fff3cd; color: #856404; }
+  .badge.depth-quick { background: #d4edda; color: #155724; }
+  .badge.sev-critical { background: #d9534f; color: #fff; }
+  .badge.sev-warn { background: #f0ad4e; color: #fff; }
+  .badge.sev-ok { background: #5cb85c; color: #fff; }
+
+  /* Phase 3.4: tool-call 状态条 */
+  .tool-call {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+  }
+  .tool-call code {
+    background: #f0f0f0;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+  }
+  .tool-args {
+    color: #666;
+    font-size: 11px;
+    font-family: monospace;
+  }
+  .tool-status[data-status="pending"] { color: #f0ad4e; }
+  .tool-status[data-status="done"] { color: #5cb85c; }
+  .tool-output {
+    width: 100%;
+    margin-top: 4px;
+    padding: 4px 6px;
+    background: #f8f8f8;
+    border-left: 2px solid #ccc;
+    font-size: 12px;
+    white-space: pre-wrap;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+
+  /* Progress message */
+  .msg.progress .bubble {
+    background: rgba(88,166,255,0.08); border-color: rgba(88,166,255,0.3);
+    font-size: 13px;
+  }
+  .mini-progress {
+    height: 4px; background: var(--bg-tertiary); border-radius: 2px;
+    margin-top: 6px; overflow: hidden;
+  }
+  .mini-progress .fill {
+    height: 100%; background: var(--accent); border-radius: 2px;
+    transition: width 0.5s;
+  }
+
+  /* Quick actions */
+  .quick-actions {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;
+  }
+  .quick-actions button {
+    padding: 6px 14px; border: 1px solid var(--border);
+    border-radius: 16px; background: var(--bg-tertiary);
+    color: var(--text-primary); font-size: 13px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .quick-actions button:hover {
+    border-color: var(--accent); background: rgba(88,166,255,0.1);
+  }
+  .quick-actions button.primary {
+    background: var(--accent-purple); border-color: var(--accent-purple);
+    color: #fff;
+  }
+
+  /* Input area */
+  .input-area {
+    padding: 12px 24px 16px; background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+  }
+  .input-row {
+    display: flex; gap: 8px; max-width: 900px; margin: 0 auto;
+  }
+  .input-row input {
+    flex: 1; background: var(--bg-tertiary); border: 1px solid var(--border);
+    color: var(--text-primary); padding: 10px 16px; border-radius: 20px;
+    font-size: 14px; font-family: inherit;
+  }
+  .input-row input:focus { outline: none; border-color: var(--accent); }
+  .input-row input:disabled { opacity: 0.5; cursor: not-allowed; }
+  .input-row button {
+    padding: 10px 20px; border: none; border-radius: 20px;
+    background: var(--accent-purple); color: #fff;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .input-row button:hover { opacity: 0.9; }
+  .input-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Upload overlay */
+  .upload-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.8); display: flex; align-items: center;
+    justify-content: center; z-index: 100;
+  }
+  .upload-card {
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px; width: 440px; max-width: 90vw;
+  }
+  .upload-card h2 { font-size: 20px; margin-bottom: 8px; }
+  .upload-card .subtitle { color: var(--text-secondary); font-size: 13px; margin-bottom: 20px; }
+  .upload-zone {
+    border: 2px dashed var(--border); border-radius: 8px;
+    padding: 30px; text-align: center; cursor: pointer;
+    transition: all 0.2s; margin-bottom: 16px;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent); background: rgba(88,166,255,0.05);
+  }
+  .upload-zone .icon { font-size: 40px; margin-bottom: 8px; }
+  .upload-zone p { color: var(--text-secondary); font-size: 13px; }
+  .upload-zone .file-types { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+  .file-selected {
+    background: rgba(63,185,80,0.1); border: 1px solid var(--accent-green);
+    border-radius: 6px; padding: 10px 14px; font-size: 13px;
+    display: none; margin-bottom: 16px;
+  }
+  .file-selected .name { font-weight: 600; }
+  .file-selected .size { color: var(--text-secondary); font-size: 12px; }
+  .file-selected .remove { color: var(--accent-red); cursor: pointer; float: right; }
+  .form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+  .form-row label { font-size: 13px; color: var(--text-secondary); }
+  .form-row select, .form-row input {
+    background: var(--bg-tertiary); border: 1px solid var(--border);
+    color: var(--text-primary); padding: 8px 12px; border-radius: 6px;
+    font-size: 14px; font-family: inherit;
+  }
+  .form-row select:focus { outline: none; border-color: var(--accent); }
+  .hidden { display: none !important; }
+  .export-btn {
+    background: var(--bg-tertiary); color: var(--accent-green);
+    border: 1px solid var(--accent-green); padding: 6px 14px;
+    border-radius: 16px; font-size: 13px; cursor: pointer;
+    margin-left: 8px;
+  }
+  .export-btn:hover { background: rgba(63,185,80,0.1); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    文档审核数字员工<span class="agent-badge">对话模式</span>
+  </div>
+  <div class="nav">
+    <button id="uploadDocBtn" class="hidden" onclick="returnToUpload()"
+            style="background:var(--accent);color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">
+      📄 上传文档审核
+    </button>
+    <a href="/">经典模式</a>
+    <a href="/agent" class="active">Agent 模式</a>
+  </div>
+</div>
+
+<div class="progress-bar-wrap" id="progressBarWrap" style="display:none;">
+  <div class="progress-stages">
+    <div class="progress-stage" data-stage="intake">
+      <div class="dot">0</div><span class="label">文档接收</span>
+    </div>
+    <div class="progress-stage" data-stage="strategy">
+      <div class="dot">1</div><span class="label">策略规划</span>
+    </div>
+    <div class="progress-stage" data-stage="audit">
+      <div class="dot">2</div><span class="label">逐章审核</span>
+    </div>
+    <div class="progress-stage" data-stage="cross_validate">
+      <div class="dot">3</div><span class="label">交叉验证</span>
+    </div>
+    <div class="progress-stage" data-stage="report">
+      <div class="dot">4</div><span class="label">报告生成</span>
+    </div>
+    <div class="progress-stage" data-stage="revision">
+      <div class="dot">5</div><span class="label">交互修订</span>
+    </div>
+  </div>
+</div>
+
+<div class="chat-container" id="chatContainer">
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="input-area" id="inputArea" style="display:none;">
+    <div class="input-row">
+      <input type="text" id="messageInput" placeholder="输入反馈或建议..."
+             onkeydown="if(event.key==='Enter')sendMessage()" disabled>
+      <button id="sendBtn" onclick="sendMessage()" disabled>发送</button>
+    </div>
+  </div>
+</div>
+
+<!-- Upload overlay -->
+<div class="upload-overlay" id="uploadOverlay">
+  <div class="upload-card">
+    <h2>开始对话式审核</h2>
+    <p class="subtitle">上传一份体系文件，与 Agent 进行交互式审核</p>
+    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+      <div class="icon">📄</div>
+      <p>点击或拖拽上传文件</p>
+      <div class="file-types">支持 .docx / .pdf</div>
+    </div>
+    <input type="file" id="fileInput" accept=".docx,.pdf" style="display:none" onchange="handleFileSelect(event)">
+    <div class="file-selected" id="fileInfo">
+      <span class="remove" onclick="removeFile()">✕</span>
+      <div class="name" id="fileName"></div>
+      <div class="size" id="fileSize"></div>
+    </div>
+    <div class="form-row">
+      <label for="auditType">审核领域</label>
+      <select id="auditType">
+        <option value="risk_management">风险管理专项</option>
+        <option value="design_dev">设计开发专项</option>
+        <option value="software_compliance">软件合规专项</option>
+        <option value="registration">注册申报专项</option>
+        <option value="production_quality">生产质量专项</option>
+        <option value="system_construction">体系建设专项</option>
+        <option value="general">综合体系审核</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label for="agentMode">Agent 模式</label>
+      <select id="agentMode">
+        <option value="single">单 Agent（支持交互修订）</option>
+        <option value="multi">多 Agent 协作（章节级并行，速度更快）</option>
+      </select>
+    </div>
+    <button class="btn" id="startConvBtn" onclick="startConversation()"
+            style="width:100%;padding:10px;background:var(--accent-purple);color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">
+      开始对话审核
+    </button>
+    <p style="font-size:11px;color:var(--text-secondary);margin-top:8px;text-align:center;">
+      提示：不上传文档也可开始自由对话，直接提问法规/体系问题
+    </p>
+  </div>
+</div>
+
+<script>
+let selectedFile = null;
+let sessionId = null;
+let eventSource = null;
+let isAwaitingInput = false;
+let lastReport = '';
+let lastFilename = '';
+let currentStage = '';
+let agentMode = 'single';  // 'single' | 'multi' — 启动会话时确定
+function apiBase() { return agentMode === 'multi' ? '/api/multi-agent' : '/api/agent'; }
+
+// DOM elements
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+const fileInfo = document.getElementById('fileInfo');
+const startConvBtn = document.getElementById('startConvBtn');
+const uploadOverlay = document.getElementById('uploadOverlay');
+const chatMessages = document.getElementById('chatMessages');
+const inputArea = document.getElementById('inputArea');
+const messageInput = document.getElementById('messageInput');
+const sendBtn = document.getElementById('sendBtn');
+const progressBarWrap = document.getElementById('progressBarWrap');
+
+// File handling
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+
+function handleFileSelect(e) { if (e.target.files.length) handleFile(e.target.files[0]); }
+function handleFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['docx', 'pdf'].includes(ext)) { alert('仅支持 .docx 和 .pdf 文件'); return; }
+  selectedFile = file;
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileSize').textContent = formatSize(file.size);
+  fileInfo.style.display = 'block';
+  uploadZone.style.display = 'none';
+  // 无文件也可启动（自由对话），有文件后切换为审核模式按钮文案
+  startConvBtn.disabled = false;
+  startConvBtn.textContent = '开始文档审核';
+}
+function removeFile() {
+  selectedFile = null;
+  fileInfo.style.display = 'none';
+  uploadZone.style.display = 'block';
+  // 无文件也能启动自由对话，按钮保持可点击
+  startConvBtn.disabled = false;
+  startConvBtn.textContent = '开始对话审核';
+  fileInput.value = '';
+}
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// Start conversation
+async function startConversation() {
+  startConvBtn.disabled = true;
+  agentMode = document.getElementById('agentMode').value;  // 'single' | 'multi'
+
+  // 无文件时仅支持单 Agent 自由对话（多 Agent 需要文档结构才能 fan-out）
+  if (!selectedFile) {
+    if (agentMode === 'multi') {
+      alert('多 Agent 协作模式需要上传文档才能进行章节级并行审核。请上传文件，或切换到单 Agent 模式进行自由对话。');
+      startConvBtn.disabled = false;
+      return;
+    }
+    agentMode = 'single';  // 强制单 Agent
+  }
+
+  const formData = new FormData();
+  if (selectedFile) {
+    formData.append('file', selectedFile);
+  }
+  formData.append('audit_type', document.getElementById('auditType').value);
+  formData.append('doc_type', '');
+  formData.append('session_id', 'conv-' + Date.now());
+
+  try {
+    const resp = await fetch(`${apiBase()}/conversation/start`, { method: 'POST', body: formData });
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.detail || 'Request failed');
+    }
+    const data = await resp.json();
+    sessionId = data.session_id;
+    lastFilename = data.filename || '';
+
+    // Hide upload overlay, show chat UI
+    uploadOverlay.classList.add('hidden');
+    inputArea.style.display = 'block';
+    progressBarWrap.style.display = 'block';
+
+    if (data.mode === 'free_chat') {
+      // 自由对话模式：不展示进度条，直接进入聊天，header 显示上传入口
+      progressBarWrap.style.display = 'none';
+      document.getElementById('uploadDocBtn').classList.remove('hidden');
+      addMessage('agent', `已进入**自由对话模式**（未上传文档）。你可以直接提问医疗器械法规、体系文件、审核标准等问题。\n\n💡 如需审核具体文档，可点击右上角「📄 上传文档审核」按钮上传文件开始审核。`);
+      updateStage('intake');
+      connectSSE();
+      enableInput(true);
+    } else {
+      // 文档审核模式：隐藏上传入口
+      document.getElementById('uploadDocBtn').classList.add('hidden');
+      const modeLabel = agentMode === 'multi' ? '多 Agent 协作（章节级并行）' : '单 Agent';
+      addMessage('agent', `会话已创建（${modeLabel}）。文档 **${escapeHtml(data.filename)}** 包含 **${data.section_count}** 个章节，类型为 **${data.audit_type}**。Agent 正在分析文档结构...`);
+      updateStage('intake');
+      connectSSE();
+      // 多 Agent 模式为一次性 fan-out，无 /message 端点，不支持交互修订
+      if (agentMode === 'multi') {
+        addMessage('agent', '⚠ 多 Agent 协作模式为一次性审核，**不支持中途追加消息**。请等待章节级并行审核完成后查看报告。');
+        enableInput(false);
+      } else {
+        enableInput(true);
+      }
+    }
+
+  } catch (err) {
+    alert('启动失败: ' + err.message);
+    startConvBtn.disabled = false;
+  }
+}
+
+// 从自由对话模式返回上传界面，开始文档审核
+function returnToUpload() {
+  // 关闭 SSE 连接
+  if (eventSource) { eventSource.close(); eventSource = null; }
+  // 重置会话状态
+  sessionId = null;
+  lastReport = '';
+  lastFilename = '';
+  currentStage = '';
+  isAwaitingInput = false;
+  // 清空聊天消息
+  chatMessages.innerHTML = '';
+  // 隐藏聊天 UI 与上传入口按钮
+  inputArea.style.display = 'none';
+  progressBarWrap.style.display = 'none';
+  document.getElementById('uploadDocBtn').classList.add('hidden');
+  // 按钮文案恢复为"开始对话审核"（无文件状态）
+  startConvBtn.textContent = '开始对话审核';
+  startConvBtn.disabled = false;
+  // 重新显示上传覆盖层
+  uploadOverlay.classList.remove('hidden');
+  // 保留已选的审核领域与 Agent 模式，清空文件选择
+  if (selectedFile) {
+    selectedFile = null;
+    fileInfo.style.display = 'none';
+    uploadZone.style.display = 'block';
+    fileInput.value = '';
+  }
+}
+
+// SSE connection
+function connectSSE() {
+  if (eventSource) { eventSource.close(); }
+
+  const url = `${apiBase()}/conversation/stream/${sessionId}`;
+  eventSource = new EventSource(url);
+
+  eventSource.onmessage = (e) => {
+    try {
+      const event = JSON.parse(e.data);
+      handleSSEEvent(event);
+    } catch (err) {
+      console.error('SSE parse error:', err);
+    }
+  };
+
+  eventSource.onerror = () => {
+    console.warn('SSE connection lost, reconnecting in 3s...');
+    eventSource.close();
+    setTimeout(connectSSE, 3000);
+  };
+}
+
+function handleSSEEvent(event) {
+  switch (event.event) {
+    case 'token':
+      handleToken(event);
+      break;
+    case 'node_complete':
+      handleNodeComplete(event);
+      break;
+    case 'checkpoint':
+      handleCheckpoint(event);
+      break;
+    case 'awaiting_input':
+      handleAwaitingInput(event);
+      break;
+    case 'agent_message':
+      handleAgentMessage(event);
+      break;
+    case 'resuming':
+      handleResuming(event);
+      break;
+    case 'complete':
+      handleComplete(event);
+      break;
+    case 'chapter_done':
+      handleChapterDone(event);
+      break;
+    case 'tool_call':
+      handleToolCall(event);
+      break;
+    case 'tool_result':
+      handleToolResult(event);
+      break;
+    case 'error':
+      handleError(event);
+      break;
+    case 'heartbeat':
+      break;
+  }
+}
+
+// 多 Agent 模式专属：章节级并行审核完成单个章节
+function handleChapterDone(event) {
+  const idx = event.chapter_idx ?? '?';
+  const title = event.chapter_title || '';
+  const pct = event.progress_pct ?? 0;
+  const summary = event.chapter_summary ? `\n\n${event.chapter_summary}` : '';
+  addMessage('progress', `**章节审核完成**: 第 ${idx} 章 ${escapeHtml(title)} (进度 ${pct}%)${summary}`);
+}
+
+// Stage mapping
+const STAGE_MAP = {
+  'intake': 0, 'strategy': 0, 'audit': 1, 'cross_validate': 2,
+  'report': 3, 'revision': 4
+};
+
+function updateStage(stage) {
+  if (stage === currentStage) return;
+  currentStage = stage;
+
+  const stages = document.querySelectorAll('.progress-stage');
+  stages.forEach(s => s.classList.remove('active', 'done'));
+
+  // Mark done up to current stage
+  let found = false;
+  stages.forEach(s => {
+    const ds = s.dataset.stage;
+    if (ds === stage) {
+      s.classList.add('active');
+      found = true;
+    } else if (!found) {
+      s.classList.add('done');
+    }
+  });
+
+  if (stage === 'complete') {
+    stages.forEach(s => { s.classList.remove('active'); s.classList.add('done'); });
+  }
+}
+
+function handleNodeComplete(event) {
+  const node = event.node;
+  // 节点切换：完结当前流式气泡，让下一节点的 token 进入新气泡
+  finalizeStreamingBubble();
+  // Map node names to stages
+  if (node === 'plan_strategy') updateStage('strategy');
+  else if (node === 'batched_audit') updateStage('audit');
+  else if (node === 'cross_validate') updateStage('cross_validate');
+  else if (node === 'generate_report') updateStage('report');
+  else if (node === 're_audit_sections') updateStage('audit');
+}
+
+// ---------- Token-level streaming ----------
+// LangGraph 'messages' stream → 增量 token，逐字渲染到一个气泡内。
+// 节点切换 / checkpoint / 审核完成时关闭当前气泡。
+let streamingBubbleEl = null;     // <div class="bubble"> 当前活动气泡
+let streamingText = '';            // 累积的原文文本
+let streamingNode = '';            // 该气泡所属节点名（用于节点切换检测）
+
+function handleToken(event) {
+  const tokenText = event.content || '';
+  if (!tokenText) return;
+  const node = event.node || '';
+
+  // 同节点连续 token：追加；节点切换：换新气泡
+  if (!streamingBubbleEl || streamingNode !== node) {
+    finalizeStreamingBubble();
+    streamingNode = node;
+    streamingText = '';
+    const div = document.createElement('div');
+    div.className = 'msg agent streaming';
+    div.innerHTML = '<div class="avatar">🤖</div><div class="bubble"></div>';
+    chatMessages.appendChild(div);
+    streamingBubbleEl = div.querySelector('.bubble');
+  }
+
+  streamingText += tokenText;
+  streamingBubbleEl.innerHTML = renderMarkdown(streamingText);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function finalizeStreamingBubble() {
+  if (streamingBubbleEl) {
+    // 移除"正在流式输出"的标记类，但保留内容
+    const wrap = streamingBubbleEl.closest('.msg');
+    if (wrap) wrap.classList.remove('streaming');
+  }
+  streamingBubbleEl = null;
+  streamingText = '';
+  streamingNode = '';
+}
+
+let autoResumeTimer = null;
+let autoResumeCountdown = 0;
+
+function handleCheckpoint(event) {
+  isAwaitingInput = true;
+  finalizeStreamingBubble();
+  const summary = event.summary || '';
+  const structured = event.structured || null;
+
+  // 自由对话模式：startConversation 已显示欢迎语，这里仅启用输入
+  if (event.checkpoint === 'free_chat') {
+    enableInput(true);
+    return;
+  }
+
+  if (event.checkpoint === 'strategy_review') {
+    updateStage('strategy');
+    addMessage('agent', `**策略规划完成**\n\n${summary}\n\n请确认审核策略，或告诉我需要调整的地方。`);
+    addCheckpointCard('strategy_review', structured);
+    addQuickActions(['approve']);
+    enableInput(true);
+  } else if (event.checkpoint === 'progress') {
+    // Progress checkpoint — auto-continue, user can interrupt
+    updateStage('audit');
+    const completed = event.completed || 0;
+    const total = event.total || 0;
+    const pct = total > 0 ? Math.round(completed / total * 100) : 0;
+    addMessage('progress', `**审核进度**: ${completed}/${total} 章节 (${pct}%)${summary ? '\n\n' + summary : ''}`);
+    // Auto-continue — no quick actions needed, but user can type anytime
+    enableInput(true);
+  } else if (event.checkpoint === 'post_audit') {
+    updateStage('audit');
+    addMessage('agent', `**章节审核完成**\n\n${summary}\n\n你可以：\n- 回复"继续"生成最终报告\n- 回复"重审第X节"对特定章节重新审核\n- 或者问我任何问题`);
+    addCheckpointCard('post_audit', structured);
+    addQuickActions(['approve', 'reaudit', 'export']);
+    enableInput(true);
+  } else if (event.checkpoint === 'report_review') {
+    updateStage('report');
+    addMessage('agent', `**报告已生成**\n\n${summary}\n\n你可以要求修改报告格式或内容，或确认完成。`);
+    addQuickActions(['approve', 'regenerate', 'export']);
+    enableInput(true);
+  } else if (event.checkpoint === 'post_completion') {
+    // Phase 1.4: 审核完成后进入自由对话模式
+    updateStage('complete');
+    addMessage('agent', `${summary || '审核报告已生成。'}\n\n你可以继续提问、要求调整报告、或导出报告。回复"结束"关闭会话。`);
+    addCheckpointCard('post_completion', structured);
+    addQuickActions(['export']);
+    enableInput(true);
+  } else {
+    addMessage('agent', `${summary || 'Agent 正在等待你的指令...'}`);
+    addQuickActions(['approve']);
+    enableInput(true);
+  }
+}
+
+function handleComplete(event) {
+  updateStage('complete');
+  isAwaitingInput = false;
+  finalizeStreamingBubble();
+  lastReport = event.report || '';
+
+  if (lastReport) {
+    addMessage('agent', renderMarkdown(lastReport));
+  }
+  addMessage('system', '审核已完成。你可以导出报告或开始新的审核。');
+  addQuickActions(['export']);
+  // Keep input enabled — user can still chat with agent after completion
+  enableInput(true);
+  if (eventSource) eventSource.close();
+}
+
+function handleError(event) {
+  addMessage('system', '错误: ' + (event.message || '未知错误'));
+  enableInput(false);
+}
+
+function handleAwaitingInput(event) {
+  isAwaitingInput = true;
+  // Clear any existing auto-resume timer
+  if (autoResumeTimer) { clearInterval(autoResumeTimer); autoResumeTimer = null; }
+
+  if (event.auto_resume) {
+    // Show countdown for auto-resume
+    autoResumeCountdown = Math.ceil(event.auto_resume_timeout || 3);
+    const cdEl = showAutoResumeCountdown(autoResumeCountdown);
+
+    autoResumeTimer = setInterval(() => {
+      autoResumeCountdown--;
+      if (autoResumeCountdown <= 0) {
+        clearInterval(autoResumeTimer);
+        autoResumeTimer = null;
+        cdEl.textContent = 'Agent 正在继续...';
+      } else {
+        cdEl.textContent = `${autoResumeCountdown}秒后自动继续（输入消息可打断）`;
+      }
+    }, 1000);
+  }
+}
+
+function handleResuming(event) {
+  // Graph is resuming after a checkpoint — clean up
+  if (autoResumeTimer) { clearInterval(autoResumeTimer); autoResumeTimer = null; }
+  removeAutoResumeCountdown();
+}
+
+function showAutoResumeCountdown(countdown) {
+  removeAutoResumeCountdown();
+  const cd = document.createElement('div');
+  cd.id = 'autoResumeCountdown';
+  cd.style.cssText = 'text-align:center;color:var(--text-secondary);font-size:12px;padding:4px 0;';
+  cd.textContent = `${countdown}秒后自动继续（输入消息可打断）`;
+  const inputArea = document.getElementById('inputArea');
+  inputArea.insertBefore(cd, inputArea.firstChild);
+  return cd;
+}
+
+function removeAutoResumeCountdown() {
+  const cd = document.getElementById('autoResumeCountdown');
+  if (cd) cd.remove();
+}
+
+function handleAgentMessage(event) {
+  // Agent sent a message (e.g., answering a question or acknowledging queued message)
+  const content = event.content || '';
+  addMessage('agent', renderMarkdown(content));
+}
+
+// Chat messages
+function addMessage(role, content) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  const avatarEmoji = role === 'agent' ? '🤖' : role === 'user' ? '👤' : '⚠';
+  div.innerHTML = `<div class="avatar">${avatarEmoji}</div><div class="bubble">${content}</div>`;
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Phase 2.5: 渲染 checkpoint 结构化卡片（策略/审核概览/完成总结）
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function addCheckpointCard(checkpoint, structured) {
+  if (!structured || typeof structured !== 'object') return;
+  const wrap = document.createElement('div');
+  wrap.className = 'msg agent';
+  const avatar = '<div class="avatar">📋</div>';
+  let body = '';
+
+  if (checkpoint === 'strategy_review' && structured.strategy) {
+    const s = structured.strategy;
+    const rows = (s.plan_preview || []).map(p =>
+      `<tr><td>${p.section_idx}</td><td>${escapeHtml(p.title || '').slice(0, 40)}</td><td><span class="badge depth-${escapeHtml(p.depth)}">${escapeHtml(p.depth)}</span></td></tr>`
+    ).join('');
+    body = `
+      <div class="card">
+        <div class="card-title">审核策略概览</div>
+        <div class="card-stats">
+          <span>章节总数：<b>${s.section_count}</b></span>
+          <span class="badge depth-deep">deep ${s.deep}</span>
+          <span class="badge depth-standard">standard ${s.standard}</span>
+          <span class="badge depth-quick">quick ${s.quick}</span>
+        </div>
+        ${rows ? `<table class="card-table"><thead><tr><th>#</th><th>章节</th><th>深度</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+      </div>`;
+  } else if (checkpoint === 'post_audit' && structured.overview) {
+    const o = structured.overview;
+    const rows = (o.sections || []).map(r => {
+      const sev = r.critical_count > 0 ? 'critical' : (r.findings_count > 0 ? 'warn' : 'ok');
+      return `<tr><td>${r.section_idx}</td><td>${escapeHtml(r.title || '').slice(0, 40)}</td><td>${escapeHtml(r.depth || '')}</td><td>${r.score ?? '-'}</td><td><span class="badge sev-${sev}">${r.findings_count}</span></td><td>${r.critical_count > 0 ? `<span class="badge sev-critical">${r.critical_count}</span>` : '-'}</td></tr>`;
+    }).join('');
+    body = `
+      <div class="card">
+        <div class="card-title">章节审核结果</div>
+        <div class="card-stats">
+          <span>已审核：<b>${o.audited}/${o.total}</b></span>
+          <span>问题总数：<b>${o.total_findings}</b></span>
+          <span class="badge sev-critical">严重 ${o.critical}</span>
+          ${o.contradictions_count > 0 ? `<span class="badge sev-warn">矛盾 ${o.contradictions_count}</span>` : ''}
+        </div>
+        ${rows ? `<table class="card-table"><thead><tr><th>#</th><th>标题</th><th>深度</th><th>分</th><th>问题</th><th>严重</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+      </div>`;
+  } else if (checkpoint === 'post_completion' && structured.completion) {
+    const c = structured.completion;
+    body = `
+      <div class="card">
+        <div class="card-title">审核完成</div>
+        <div class="card-stats">
+          <span>章节：<b>${c.audited_count}/${c.section_count}</b></span>
+          ${c.has_report ? '<span class="badge sev-ok">报告已生成</span>' : '<span class="badge sev-warn">无报告</span>'}
+        </div>
+      </div>`;
+  } else {
+    return;
+  }
+
+  wrap.innerHTML = avatar + '<div class="bubble">' + body + '</div>';
+  chatMessages.appendChild(wrap);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Phase 3.4: 工具调用状态卡（Agent tool-call 实时反馈）
+const _toolCallEls = {};   // tool_id → DOM element
+
+function handleToolCall(event) {
+  finalizeStreamingBubble();
+  const tid = event.tool_id || ('t_' + Date.now());
+  const name = event.tool_name || 'unknown';
+  const argsPreview = event.tool_args ? JSON.stringify(event.tool_args).slice(0, 120) : '';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'msg agent tool-msg';
+  wrap.innerHTML = `
+    <div class="avatar">🔧</div>
+    <div class="bubble">
+      <div class="tool-call">
+        <span class="badge sev-warn">调用工具</span>
+        <code>${escapeHtml(name)}</code>
+        ${argsPreview ? `<span class="tool-args">${escapeHtml(argsPreview)}</span>` : ''}
+        <span class="tool-status" data-status="pending">⏳ 执行中…</span>
+      </div>
+    </div>`;
+  chatMessages.appendChild(wrap);
+  _toolCallEls[tid] = wrap;
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function handleToolResult(event) {
+  const tid = event.tool_id;
+  const preview = event.result_preview || '';
+  const el = _toolCallEls[tid];
+  if (el) {
+    const status = el.querySelector('.tool-status');
+    if (status) {
+      status.dataset.status = 'done';
+      status.textContent = '✓ 完成';
+    }
+    if (preview) {
+      const out = document.createElement('div');
+      out.className = 'tool-output';
+      out.textContent = preview;
+      el.querySelector('.tool-call')?.appendChild(out);
+    }
+    delete _toolCallEls[tid];
+  } else {
+    // 没找到对应的 tool_call，作为独立消息渲染
+    const wrap = document.createElement('div');
+    wrap.className = 'msg agent tool-msg';
+    wrap.innerHTML = `
+      <div class="avatar">🔧</div>
+      <div class="bubble">
+        <div class="tool-call">
+          <span class="badge sev-ok">工具结果</span>
+          <code>${escapeHtml(event.tool_name || '')}</code>
+          <div class="tool-output">${escapeHtml(preview)}</div>
+        </div>
+      </div>`;
+    chatMessages.appendChild(wrap);
+  }
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function addQuickActions(types) {
+  // Remove existing quick actions
+  document.querySelectorAll('.quick-actions').forEach(el => el.remove());
+
+  const actions = document.createElement('div');
+  actions.className = 'quick-actions';
+
+  if (types.includes('approve')) {
+    const btn = document.createElement('button');
+    btn.className = 'primary';
+    btn.textContent = '继续';
+    btn.onclick = () => sendMessage('继续');
+    actions.appendChild(btn);
+  }
+  if (types.includes('reaudit')) {
+    const btn = document.createElement('button');
+    btn.textContent = '重审指定章节';
+    btn.onclick = () => {
+      messageInput.value = '重审第';
+      messageInput.focus();
+    };
+    actions.appendChild(btn);
+  }
+  if (types.includes('skip')) {
+    const btn = document.createElement('button');
+    btn.textContent = '跳过章节';
+    btn.onclick = () => {
+      messageInput.value = '跳过第';
+      messageInput.focus();
+    };
+    actions.appendChild(btn);
+  }
+  if (types.includes('regenerate')) {
+    const btn = document.createElement('button');
+    btn.textContent = '修改报告';
+    btn.onclick = () => {
+      messageInput.value = '请修改报告：';
+      messageInput.focus();
+    };
+    actions.appendChild(btn);
+  }
+  if (types.includes('export')) {
+    const btn = document.createElement('button');
+    btn.className = 'export-btn';
+    btn.textContent = '导出 Word 报告';
+    btn.onclick = exportReport;
+    actions.appendChild(btn);
+  }
+
+  chatMessages.appendChild(actions);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function enableInput(enabled) {
+  messageInput.disabled = !enabled;
+  sendBtn.disabled = !enabled;
+  if (enabled) messageInput.focus();
+}
+
+// Send message — can be called at any time (checkpoint or mid-audit)
+async function sendMessage(text) {
+  const content = text || messageInput.value.trim();
+  if (!content || !sessionId) return;
+
+  // 多 Agent 模式无 /message 端点，不支持中途追加消息
+  if (agentMode === 'multi') {
+    addMessage('system', '多 Agent 协作模式不支持中途追加消息，请等待审核完成。');
+    return;
+  }
+
+  addMessage('user', escapeHtml(content));
+  messageInput.value = '';
+  // Input stays enabled — user can send messages at any time
+
+  // Remove quick actions
+  document.querySelectorAll('.quick-actions').forEach(el => el.remove());
+
+  const formData = new FormData();
+  formData.append('session_id', sessionId);
+  formData.append('message', content);
+
+  try {
+    const resp = await fetch('/api/agent/conversation/message', { method: 'POST', body: formData });
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.detail || 'Request failed');
+    }
+    // SSE stays connected across checkpoints — events flow automatically.
+    // Only reconnect if the SSE was actually dropped (network issue, etc.)
+    if (eventSource && eventSource.readyState === EventSource.CLOSED) {
+      console.warn('SSE unexpectedly closed, reconnecting...');
+      connectSSE();
+    }
+  } catch (err) {
+    addMessage('system', '发送失败: ' + err.message);
+  }
+}
+
+// Export
+async function exportReport() {
+  if (!lastReport) {
+    // 尝试从服务端获取报告
+    try {
+      const resp = await fetch(`${apiBase()}/conversation/state/${sessionId}`);
+      const state = await resp.json();
+      // 单 Agent state: final_report 字段；多 Agent state: has_final_report 标记（无 final_report 字段）
+      const hasReport = state.final_report || state.has_final_report;
+      if (state.finished && state.final_report) {
+        lastReport = state.final_report;
+      } else if (state.finished && hasReport) {
+        addMessage('system', '正在从服务端获取报告...');
+        // 重新从图状态拉取完整报告
+        const reportResp = await fetch(`${apiBase()}/conversation/report/${sessionId}`);
+        if (reportResp.ok) {
+          const reportData = await reportResp.json();
+          lastReport = reportData.report || reportData.final_report || '';
+        }
+        if (!lastReport) {
+          alert('报告数据暂未生成，请稍后再试');
+          return;
+        }
+      } else {
+        alert('报告尚未生成，请等待审核完成');
+        return;
+      }
+    } catch (e) {
+      alert('报告尚未生成，请等待审核完成');
+      return;
+    }
+  }
+  try {
+    const resp = await fetch('/api/export-review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: lastReport, filename: lastFilename || 'agent_audit' })
+    });
+    if (!resp.ok) throw new Error('导出失败');
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (lastFilename || 'agent_audit').replace(/\.[^.]+$/, '') + '_conversation_audit_report.docx';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('导出失败: ' + err.message);
+  }
+}
+
+// Simple markdown renderer
+function renderMarkdown(md) {
+  if (!md) return '';
+  let html = md;
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  html = html.replace(/^\|(.+)\|$/gm, function(m) {
+    const cells = m.split('|').filter(c => c.trim());
+    if (m.match(/^[\|\s\-:]+$/)) return '';
+    const isHeader = !m.match(/^\|[\s\-:]+\|$/);
+    const tag = isHeader ? 'th' : 'td';
+    return '<tr>' + cells.map(c => '<' + tag + '>' + c.trim() + '</' + tag + '>').join('') + '</tr>';
+  });
+  html = html.replace(/(<tr>[\s\S]*?<\/tr>)+/g, '<table>$&</table>');
+  html = html.replace(/^---+$/gm, '<hr>');
+  html = html.replace(/^(\s*)- (.+)$/gm, '<li>$2</li>');
+  html = html.replace(/^(\s*)\d+\. (.+)$/gm, '<li>$2</li>');
+  html = html.replace(/(<li>[\s\S]*?<\/li>)+/g, '<ul>$&</ul>');
+  html = html.replace(/\n\n/g, '</p><p>');
+  html = '<p>' + html + '</p>';
+  html = html.replace(/<p>\s*<\/p>/g, '');
+  html = html.replace(/<\/ul>\s*<ul>/g, '');
+  return html;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+</script>
+</body>
+</html>

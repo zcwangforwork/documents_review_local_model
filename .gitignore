@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Databases & vector stores (regenerable, can exceed GitHub size limits)
+*.sqlite3
+*.sqlite
+*.db
+*.db-wal
+*.db-shm
+**/chroma_db*/
+**/data_level0.bin
+**/index_metadata.pickle
+
+# Runtime state / checkpoints
+**/checkpoints/
+**/conversation.db*
+**/multi_agent.db*
+
+# Logs & reports
+*.log
+*_log.txt
+ingest_remaining_log.txt
+missing_files_report.txt
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude / agent local settings
+.claude/settings.local.json
+.gstack/
+
+# OS files
+Thumbs.db
+.DS_Store
