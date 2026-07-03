@@ -427,7 +427,11 @@ def _retrieve_section_knowledge(section: dict, doc_type: str, retriever, top_k: 
     query = " ".join(query_parts)[:1000]
 
     try:
-        docs = retriever.search_sync(query, top_k=top_k)
+        # 优先使用带 LLM listwise 重排的检索（方案A），回退到普通检索
+        if hasattr(retriever, "search_sync_with_rerank"):
+            docs = retriever.search_sync_with_rerank(query, top_k=top_k)
+        else:
+            docs = retriever.search_sync(query, top_k=top_k)
         if not docs:
             return ""
 
@@ -923,14 +927,13 @@ def generate_report_node(state: AuditState, llm: ChatOpenAI) -> dict:
         title = r.get("title", "Untitled")
         breadcrumb = r.get("breadcrumb", "") or title
         depth = r.get("depth", "standard")
-        confidence = r.get("confidence", "?")
         round_count = r.get("round_count", 1)
         content = r.get("result_content", "")
 
         sections_detail_lines.append(f"### 3.{idx + 1} {breadcrumb}")
         sections_detail_lines.append("")
         sections_detail_lines.append(
-            f"> **审核深度**：{depth} ｜ **可信度**：{confidence}/5 ｜ **审核轮次**：{round_count}"
+            f"> **审核深度**：{depth} ｜ **审核轮次**：{round_count}"
         )
         sections_detail_lines.append("")
 
@@ -957,7 +960,7 @@ def generate_report_node(state: AuditState, llm: ChatOpenAI) -> dict:
         for i, c in enumerate(contradictions, 1):
             sec_ref = c.get("sections", [])
             contradictions_block += (
-                f"{i}. **涉及小节 {sec_ref}**（严重度：{c.get('severity', 'unknown')}）\n"
+                f"{i}. **涉及小节 {sec_ref}**\n"
                 f"   - 描述：{c.get('description', '')}\n"
                 f"   - 建议：{c.get('recommendation', '')}\n\n"
             )
@@ -993,7 +996,7 @@ def generate_report_node(state: AuditState, llm: ChatOpenAI) -> dict:
 请用中文输出严格遵循以下 Markdown 格式的结果（不要添加任何额外内容、不要包裹代码块）：
 
 <<OVERVIEW>>
-[此处写 3-5 句的整体概述：覆盖范围、整体合规度初判、最值得关注的几个跨章节问题。不要列出每小节细节，那些在报告下半段已展示。]
+[此处写 3-5 句的整体概述：覆盖范围、整体合规情况、最值得关注的几个跨章节问题。不要列出每小节细节，不要给出评分或合规等级，那些在报告下半段已展示。]
 <<END_OVERVIEW>>
 
 <<CONCLUSION>>

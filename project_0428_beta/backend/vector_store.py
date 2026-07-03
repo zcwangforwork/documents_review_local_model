@@ -226,7 +226,8 @@ class VectorStore:
             query_embeddings = self._get_query_embeddings(query_texts)
 
         # 限制每次查询返回结果数，避免加载过多 HNSW 索引数据
-        safe_n_results = min(n_results, 10)
+        # 上限放宽到 20 以支持 LLM listwise 重排（方案A）所需候选集
+        safe_n_results = min(n_results, 20)
 
         # 构建查询参数
         if query_embeddings is not None:

@@ -503,15 +503,8 @@ async function startConversation() {
   startConvBtn.disabled = true;
   agentMode = document.getElementById('agentMode').value;  // 'single' | 'multi'
 
-  // 无文件时仅支持单 Agent 自由对话（多 Agent 需要文档结构才能 fan-out）
-  if (!selectedFile) {
-    if (agentMode === 'multi') {
-      alert('多 Agent 协作模式需要上传文档才能进行章节级并行审核。请上传文件，或切换到单 Agent 模式进行自由对话。');
-      startConvBtn.disabled = false;
-      return;
-    }
-    agentMode = 'single';  // 强制单 Agent
-  }
+  // 无文件时进入自由对话模式（单/多 Agent 均支持）
+  // 有文件时走文档审核流程
 
   const formData = new FormData();
   if (selectedFile) {
@@ -551,13 +544,8 @@ async function startConversation() {
       addMessage('agent', `会话已创建（${modeLabel}）。文档 **${escapeHtml(data.filename)}** 包含 **${data.section_count}** 个章节，类型为 **${data.audit_type}**。Agent 正在分析文档结构...`);
       updateStage('intake');
       connectSSE();
-      // 多 Agent 模式为一次性 fan-out，无 /message 端点，不支持交互修订
-      if (agentMode === 'multi') {
-        addMessage('agent', '⚠ 多 Agent 协作模式为一次性审核，**不支持中途追加消息**。请等待章节级并行审核完成后查看报告。');
-        enableInput(false);
-      } else {
-        enableInput(true);
-      }
+      // 多 Agent 模式现已支持完整对话循环（分章确认 / 重审 / 报告后对话）
+      enableInput(true);
     }
 
   } catch (err) {
@@ -753,7 +741,7 @@ function finalizeStreamingBubble() {
 let autoResumeTimer = null;
 let autoResumeCountdown = 0;
 
-function handleCheckpoint(event) {
+async function handleCheckpoint(event) {
   isAwaitingInput = true;
   finalizeStreamingBubble();
   const summary = event.summary || '';
@@ -765,10 +753,10 @@ function handleCheckpoint(event) {
     return;
   }
 
-  if (event.checkpoint === 'strategy_review') {
+  if (event.checkpoint === 'strategy_review' || event.checkpoint === 'structure_review') {
     updateStage('strategy');
-    addMessage('agent', `**策略规划完成**\n\n${summary}\n\n请确认审核策略，或告诉我需要调整的地方。`);
-    addCheckpointCard('strategy_review', structured);
+    addMessage('agent', `**结构分析完成**\n\n${summary}\n\n请确认分章策略，或告诉我需要调整的地方。`);
+    addCheckpointCard(event.checkpoint, structured);
     addQuickActions(['approve']);
     enableInput(true);
   } else if (event.checkpoint === 'progress') {
@@ -782,7 +770,10 @@ function handleCheckpoint(event) {
     enableInput(true);
   } else if (event.checkpoint === 'post_audit') {
     updateStage('audit');
-    addMessage('agent', `**章节审核完成**\n\n${summary}\n\n你可以：\n- 回复"继续"生成最终报告\n- 回复"重审第X节"对特定章节重新审核\n- 或者问我任何问题`);
+    const reauditHint = agentMode === 'multi'
+      ? '回复"重审第X章"对特定章节重新审核'
+      : '回复"重审第X节"对特定章节重新审核';
+    addMessage('agent', `**章节审核完成**\n\n${summary}\n\n你可以：\n- 回复"继续"生成最终报告\n- ${reauditHint}\n- 或者问我任何问题`);
     addCheckpointCard('post_audit', structured);
     addQuickActions(['approve', 'reaudit', 'export']);
     enableInput(true);
@@ -796,6 +787,16 @@ function handleCheckpoint(event) {
     updateStage('complete');
     addMessage('agent', `${summary || '审核报告已生成。'}\n\n你可以继续提问、要求调整报告、或导出报告。回复"结束"关闭会话。`);
     addCheckpointCard('post_completion', structured);
+    // 拉取并展示完整审核报告
+    try {
+      const rptBase = agentMode === 'multi' ? '/api/multi-agent' : '/api/agent';
+      const r = await fetch(`${rptBase}/conversation/report/${sessionId}`);
+      if (r.ok) {
+        const rd = await r.json();
+        const rpt = rd.report || rd.final_report || '';
+        if (rpt) { lastReport = rpt; addMessage('agent', renderMarkdown(rpt)); }
+      }
+    } catch (_) { /* 报告拉取失败不阻塞对话 */ }
     addQuickActions(['export']);
     enableInput(true);
   } else {
@@ -1079,12 +1080,6 @@ async function sendMessage(text) {
   const content = text || messageInput.value.trim();
   if (!content || !sessionId) return;
 
-  // 多 Agent 模式无 /message 端点，不支持中途追加消息
-  if (agentMode === 'multi') {
-    addMessage('system', '多 Agent 协作模式不支持中途追加消息，请等待审核完成。');
-    return;
-  }
-
   addMessage('user', escapeHtml(content));
   messageInput.value = '';
   // Input stays enabled — user can send messages at any time
@@ -1097,7 +1092,8 @@ async function sendMessage(text) {
   formData.append('message', content);
 
   try {
-    const resp = await fetch('/api/agent/conversation/message', { method: 'POST', body: formData });
+    const msgBase = agentMode === 'multi' ? '/api/multi-agent' : '/api/agent';
+    const resp = await fetch(`${msgBase}/conversation/message`, { method: 'POST', body: formData });
     if (!resp.ok) {
       const err = await resp.json();
       throw new Error(err.detail || 'Request failed');

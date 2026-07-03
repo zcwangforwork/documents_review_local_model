@@ -58,6 +58,14 @@ class MultiAgentState(TypedDict):
     pending_checkpoint: str
     conversation_context: str
 
+    # ====== 完整对话循环扩展（re-audit / skip / chat memory）======
+    re_audit_chapters: List[int]       # 需重审的章节索引（chapter_idx）
+    revision_requests: List[dict]      # 用户修订请求（含 standard_override）
+    skip_chapters: List[int]           # 需跳过的章节索引
+    re_audit_cycle_count: int          # 重审循环计数（上限 MAX_RE_AUDIT_CYCLES）
+    summary: str                       # 长对话摘要（chat 环用）
+    awaiting_input: bool               # 是否等待用户输入（free chat 用）
+
 
 def make_multi_agent_initial_state(
     document_text: str,
@@ -95,6 +103,13 @@ def make_multi_agent_initial_state(
         "user_feedback": "",
         "pending_checkpoint": "",
         "conversation_context": "",
+        # 完整对话循环
+        "re_audit_chapters": [],
+        "revision_requests": [],
+        "skip_chapters": [],
+        "re_audit_cycle_count": 0,
+        "summary": "",
+        "awaiting_input": False,
     }
 
 

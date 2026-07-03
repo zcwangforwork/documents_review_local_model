@@ -37,6 +37,8 @@ from multi_agent import (
     make_multi_agent_initial_state,
     compile_supervisor_graph,
 )
+# 对话阶段 RAG 检索助手（单/多 agent 共用）
+from chat_rag import answer_with_rag, should_use_rag
 
 
 logger = logging.getLogger(__name__)
@@ -574,6 +576,7 @@ async def lifespan(app: FastAPI):
             llm=ma_llm,
             retriever=rag_retriever,
             checkpointer=multi_agent_checkpointer,
+            conversation_mode=True,
         )
         print("LangGraph Multi-Agent Supervisor Graph 已编译就绪 (AsyncSqliteSaver)")
     except Exception as e:
@@ -1488,6 +1491,7 @@ async def conversation_message(
 
     # ===== 自由对话模式（无文档）：强制 question intent，直接 LLM 回答 =====
     # 自由对话模式下 graph 未启动，跳过所有 graph 状态更新与 resume 逻辑。
+    # 若问题命中 RAG 关键词，会先检索向量库再回答（复用 rag_search 底层逻辑）。
     if session.awaiting_input and not session.filename:
         question_text = (
             classification.get("question_text", message)
@@ -1495,16 +1499,15 @@ async def conversation_message(
         )
         try:
             answer_llm = create_agent_llm(temperature=0.3)
-            answer_prompt = (
-                "你是一个医疗器械文档审核专家，精通 ISO 13485、IEC 62304、ISO 14971、"
-                "MDR 2017/745、NMPA GMP 等法规标准。\n\n"
-                f"用户问题：{question_text}\n\n"
-                "请基于专业知识详细回答。如果用户的问题需要审核具体文档，"
-                "请提示用户上传文档后使用审核功能。"
-            )
-            answer_resp = await answer_llm.ainvoke([HumanMessage(content=answer_prompt)])
-            extra_response = (
-                answer_resp.content if hasattr(answer_resp, "content") else str(answer_resp)
+            extra_response = await answer_with_rag(
+                question=question_text,
+                llm=answer_llm,
+                retriever=rag_retriever,
+                system_prompt_prefix=(
+                    "你是一个医疗器械文档审核专家，精通 ISO 13485、IEC 62304、ISO 14971、"
+                    "MDR 2017/745、NMPA GMP 等法规标准。\n\n"
+                    "如果用户的问题需要审核具体文档，请提示用户上传文档后使用审核功能。"
+                ),
             )
         except Exception as e:
             logger.warning(f"Free-chat answering failed: {e}")
@@ -1542,16 +1545,19 @@ async def conversation_message(
 
     if intent == "question":
         # Answer the user's question directly, then auto-resume the graph
+        # 命中 RAG 关键词时先检索向量库再回答（复用 rag_search 底层逻辑）
         question_text = classification.get("question_text", message)
         try:
             answer_llm = create_agent_llm(temperature=0.3)
-            answer_prompt = (
-                f"你是一个医疗器械文档审核专家。用户在当前审核过程中问了一个问题。\n\n"
-                f"用户问题：{question_text}\n\n"
-                f"请简洁回答（100字以内）。"
+            extra_response = await answer_with_rag(
+                question=question_text,
+                llm=answer_llm,
+                retriever=rag_retriever,
+                system_prompt_prefix=(
+                    "你是一个医疗器械文档审核专家。用户在当前审核过程中问了一个问题。\n"
+                    "请简洁回答（100字以内）。"
+                ),
             )
-            answer_resp = await answer_llm.ainvoke([HumanMessage(content=answer_prompt)])
-            extra_response = answer_resp.content if hasattr(answer_resp, "content") else str(answer_resp)
             await session.queue.put({
                 "event": "agent_message",
                 "content": extra_response,
@@ -1762,17 +1768,20 @@ _multi_agent_sessions: Dict[str, "MultiAgentSession"] = {}
 class MultiAgentSession:
     """多 Agent 协作模式的对话会话状态。
 
-    与单 Agent ConversationSession 类似，但状态字段对齐 MultiAgentState。
-    多 Agent 当前不在 supervisor 图内插入 interrupt 检查点，仅做 SSE 流式推送
-    （node_complete / chapter_progress / token / complete / error）。
+    与单 Agent ConversationSession 对齐，支持 interrupt 检查点 + Command resume
+    + free chat（无文档）+ 消息排队。
     """
 
     def __init__(self, session_id: str, config: dict):
         self.session_id = session_id
         self.config = config
         self.queue: asyncio.Queue = asyncio.Queue()
+        self.awaiting_input = False
         self.task: Optional[asyncio.Task] = None
         self.filename = ""
+        self.resume_event: asyncio.Event = asyncio.Event()
+        self.pending_message: str = ""
+        self.queued_message: str = ""
         import time as _time
         now = _time.time()
         self.created_at: float = now
@@ -1918,71 +1927,116 @@ async def _run_multi_agent_and_push_events(
     session: MultiAgentSession,
     initial_input: dict,
 ):
-    """多 Agent SSE 后台任务：流式推送 supervisor graph 执行进度。
+    """多 Agent SSE 后台任务 — persistent loop，支持 interrupt 检查点 + Command resume。
 
     事件类型:
-    - token        : LLM 流式 token（章节审核 / 综合报告）
-    - node_complete: supervisor 节点完成（analyze_structure / audit_chapter / synthesize_report）
-    - chapter_done : 单个章节审核完成（携带 chapter_idx, chapter_title, section_count）
-    - complete     : 全部完成，携带 final_report
+    - token        : LLM 流式 token
+    - node_complete: supervisor 节点完成
+    - chapter_done : 单个章节审核完成
+    - checkpoint   : interrupt 检查点（structure_review / post_audit / post_completion）
+    - awaiting_input: 等待用户输入
+    - agent_message: 检查点期间 LLM 直接回答（question intent）
+    - resuming     : 恢复执行
+    - complete     : 全部完成（含 final_report）
     - error        : 异常
     """
+    from langgraph.types import Command
     graph = multi_agent_graph
+    state_to_run = initial_input
+
     try:
-        async for mode, chunk in graph.astream(
-            initial_input, session.config,
-            stream_mode=["messages", "updates"],
-        ):
-            if mode == "messages":
-                message_chunk, metadata = chunk
-                token_text = getattr(message_chunk, "content", "") or ""
-                if token_text:
-                    await session.queue.put({
-                        "event": "token",
-                        "content": token_text,
-                        "node": (metadata or {}).get("langgraph_node", ""),
-                    })
-            elif mode == "updates":
-                for node_name, node_output in chunk.items():
-                    if not isinstance(node_output, dict):
-                        continue
-
-                    # 章节审核完成（reducer 视角下每次会单独 push 一份 chapter_results 增量）
-                    if node_name == "audit_chapter":
-                        chapters_delta = node_output.get("chapter_results", []) or []
-                        for ch in chapters_delta:
-                            await session.queue.put({
-                                "event": "chapter_done",
-                                "chapter_idx": ch.get("chapter_idx"),
-                                "chapter_title": ch.get("chapter_title"),
-                                "section_count": len(ch.get("subsection_results", [])),
-                                "chapter_summary": (ch.get("chapter_summary", "") or "")[:500],
-                            })
-                    else:
+        while True:
+            async for mode, chunk in graph.astream(
+                state_to_run, session.config,
+                stream_mode=["messages", "updates"],
+            ):
+                if mode == "messages":
+                    message_chunk, metadata = chunk
+                    token_text = getattr(message_chunk, "content", "") or ""
+                    if token_text:
                         await session.queue.put({
-                            "event": "node_complete",
-                            "node": node_name,
-                            "current_stage": node_output.get("current_stage", ""),
-                            "total_chapters": node_output.get("total_chapters"),
-                            "total_sections": node_output.get("total_sections"),
-                            "total_agent_steps": node_output.get("total_agent_steps"),
+                            "event": "token",
+                            "content": token_text,
+                            "node": (metadata or {}).get("langgraph_node", ""),
                         })
+                elif mode == "updates":
+                    for node_name, node_output in chunk.items():
+                        if not isinstance(node_output, dict):
+                            continue
+                        if node_name == "audit_chapter":
+                            chapters_delta = node_output.get("chapter_results", []) or []
+                            for ch in chapters_delta:
+                                await session.queue.put({
+                                    "event": "chapter_done",
+                                    "chapter_idx": ch.get("chapter_idx"),
+                                    "chapter_title": ch.get("chapter_title"),
+                                    "section_count": len(ch.get("subsection_results", [])),
+                                    "chapter_summary": (ch.get("chapter_summary", "") or "")[:500],
+                                })
+                        else:
+                            await session.queue.put({
+                                "event": "node_complete",
+                                "node": node_name,
+                                "current_stage": node_output.get("current_stage", ""),
+                                "total_chapters": node_output.get("total_chapters"),
+                                "total_sections": node_output.get("total_sections"),
+                                "total_agent_steps": node_output.get("total_agent_steps"),
+                            })
 
-        # graph 执行完成
-        final_state = await graph.aget_state(session.config)
-        report = ""
-        chapter_count = 0
-        section_count = 0
-        if final_state and final_state.values:
-            report = final_state.values.get("final_report", "") or ""
-            chapter_count = len(final_state.values.get("chapter_results", []) or [])
-            section_count = len(final_state.values.get("subsection_results", []) or [])
-        await session.queue.put({
-            "event": "complete",
-            "report": report,
-            "chapter_count": chapter_count,
-            "section_count": section_count,
-        })
+            # ----- 检查是否被 interrupt 暂停 -----
+            current = await graph.aget_state(session.config)
+            if current and current.interrupts:
+                value = current.interrupts[-1].value or {}
+                checkpoint_type = value.get("checkpoint", "")
+                await session.queue.put({
+                    "event": "checkpoint",
+                    "checkpoint": checkpoint_type,
+                    "stage": value.get("stage", ""),
+                    "summary": value.get("summary", ""),
+                    "chapter_count": value.get("chapter_count", 0),
+                    "subsection_count": value.get("subsection_count", 0),
+                    "section_count": value.get("section_count", 0),
+                    "structured": value.get("structured", {}),
+                })
+                session.awaiting_input = True
+                await session.queue.put({
+                    "event": "awaiting_input",
+                    "checkpoint": checkpoint_type,
+                    "auto_resume": False,
+                })
+
+                # 合并排队的消息
+                if session.queued_message:
+                    if not session.pending_message:
+                        session.pending_message = session.queued_message
+                    session.queued_message = ""
+
+                await session.resume_event.wait()
+                session.resume_event.clear()
+                message = session.pending_message or "继续"
+                session.pending_message = ""
+                session.awaiting_input = False
+                await session.queue.put({"event": "resuming"})
+                state_to_run = Command(resume=message)
+                continue
+
+            # ----- 无 interrupt — graph 执行完成 -----
+            final_state = await graph.aget_state(session.config)
+            report = ""
+            chapter_count = 0
+            section_count = 0
+            if final_state and final_state.values:
+                report = final_state.values.get("final_report", "") or ""
+                chapter_count = len(final_state.values.get("chapter_results", []) or [])
+                section_count = len(final_state.values.get("subsection_results", []) or [])
+            await session.queue.put({
+                "event": "complete",
+                "report": report,
+                "chapter_count": chapter_count,
+                "section_count": section_count,
+            })
+            session.awaiting_input = False
+            break
 
     except asyncio.CancelledError:
         pass
@@ -1995,15 +2049,15 @@ async def _run_multi_agent_and_push_events(
 
 @app.post("/api/multi-agent/conversation/start")
 async def multi_agent_conversation_start(
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
     session_id: str = Form("default"),
     audit_type: str = Form("risk_management"),
     doc_type: str = Form(""),
 ):
     """启动多 Agent 协作流式审核会话。
 
-    上传文档 → 解析结构 → 创建 multi-agent session → 启动后台 graph 执行
-    前端连接 SSE (/api/multi-agent/conversation/stream/{session_id}) 接收事件
+    - 有文档：上传 → 解析结构 → 创建 session → 启动后台 graph（含 interrupt 检查点）
+    - 无文档：创建 free chat session（awaiting_input=True，不启动 graph），直接 LLM 问答
     """
     if not multi_agent_graph:
         raise HTTPException(status_code=503, detail="Multi-Agent 协作服务未就绪")
@@ -2018,13 +2072,48 @@ async def multi_agent_conversation_start(
     if audit_type not in VALID_TYPES:
         audit_type = "general"
 
+    # 清理可能存在的旧会话
+    await _cleanup_multi_agent_session(session_id)
+
+    # ===== free chat 模式（无文档）=====
+    if file is None or not file.filename:
+        config = {
+            "configurable": {"thread_id": f"multi-agent-{session_id}"},
+            "recursion_limit": 200,
+        }
+        session = MultiAgentSession(session_id=session_id, config=config)
+        session.filename = ""
+        session.awaiting_input = True
+        _multi_agent_sessions[session_id] = session
+
+        await session.queue.put({
+            "event": "checkpoint",
+            "checkpoint": "free_chat",
+            "stage": "自由对话",
+            "summary": "已进入自由对话模式（多 Agent）。直接提问即可，上传文档后可开始审核。",
+        })
+        await session.queue.put({
+            "event": "awaiting_input",
+            "checkpoint": "free_chat",
+            "auto_resume": False,
+        })
+
+        print(f"[MultiAgent:Conversation] free-chat 会话已创建: {session_id}")
+        return {
+            "session_id": session_id,
+            "filename": "",
+            "section_count": 0,
+            "audit_type": audit_type,
+            "pipeline": "multi_agent",
+            "mode": "free_chat",
+            "message": "自由对话会话已创建，请通过 SSE 连接接收事件",
+        }
+
+    # ===== 文档审核模式 =====
     filename = file.filename or ""
     ext = Path(filename).suffix.lower()
     if ext not in ['.docx', '.pdf']:
         raise HTTPException(status_code=400, detail=f"不支持的文件格式: {ext}")
-
-    # 清理可能存在的旧会话
-    await _cleanup_multi_agent_session(session_id)
 
     tmp_path = None
     try:
@@ -2087,6 +2176,229 @@ async def multi_agent_conversation_start(
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
+
+
+@app.post("/api/multi-agent/conversation/message")
+async def multi_agent_conversation_message(
+    session_id: str = Form(...),
+    message: str = Form(...),
+):
+    """多 Agent 对话模式 — 处理用户消息。
+
+    三种场景:
+    1. free chat（无文档）：直接 LLM 回答
+    2. graph running：消息排队，下一个检查点处理
+    3. 检查点暂停：intent 分类（question/adjust/supplement/skip/approve），更新 state 后 Command resume
+    """
+    from langgraph.types import Command
+    from agent_graph import _classify_intent_async
+
+    if session_id not in _multi_agent_sessions:
+        raise HTTPException(status_code=404, detail="会话不存在或已过期")
+
+    session = _multi_agent_sessions[session_id]
+    session.touch()
+
+    if not message or not message.strip():
+        raise HTTPException(status_code=400, detail="消息内容不能为空")
+    message = message.strip()
+
+    # ===== 1. free chat（无文档）=====
+    if session.awaiting_input and not session.filename:
+        try:
+            intent_llm = create_agent_llm(temperature=0.1)
+            classification = await _classify_intent_async(message, intent_llm)
+        except Exception as e:
+            logger.warning(f"Multi-agent free-chat intent 分类失败: {e}")
+            classification = {"intent": "question", "question_text": message}
+
+        question_text = (
+            classification.get("question_text", message)
+            if classification.get("intent") == "question" else message
+        )
+        try:
+            answer_llm = create_agent_llm(temperature=0.3)
+            extra_response = await answer_with_rag(
+                question=question_text,
+                llm=answer_llm,
+                retriever=rag_retriever,
+                system_prompt_prefix=(
+                    "你是一个医疗器械文档审核专家，精通 ISO 13485、IEC 62304、ISO 14971、"
+                    "MDR 2017/745、NMPA GMP 等法规标准。\n\n"
+                    "如果用户的问题需要审核具体文档，请提示用户上传文档后使用审核功能。"
+                ),
+            )
+        except Exception as e:
+            logger.warning(f"Multi-agent free-chat answering failed: {e}")
+            extra_response = f"抱歉，处理您的问题时出错: {e}"
+
+        await session.queue.put({
+            "event": "agent_message",
+            "content": extra_response,
+            "intent": "question",
+        })
+        return {
+            "session_id": session_id,
+            "intent": "question",
+            "status": "answered",
+            "message": "消息已处理",
+            "extra_response": extra_response,
+        }
+
+    # ===== 2. graph running — 排队 =====
+    if not session.awaiting_input:
+        session.queued_message = message
+        await session.queue.put({
+            "event": "agent_message",
+            "content": f"已收到你的消息：「{message[:100]}」\nAgent 将在当前阶段完成后立即处理。",
+        })
+        return {
+            "session_id": session_id,
+            "status": "queued",
+            "message": "消息已排队，将在下一个检查点处理",
+        }
+
+    # ===== 3. 检查点暂停 — intent 分类 + 处理 =====
+    try:
+        intent_llm = create_agent_llm(temperature=0.1)
+        classification = await _classify_intent_async(message, intent_llm)
+    except Exception as e:
+        logger.warning(f"Multi-agent intent 分类失败: {e}")
+        classification = {"intent": "approve"}
+
+    intent = classification.get("intent", "approve")
+    extra_response = None
+
+    if intent == "question":
+        # 直接回答，然后 resume
+        # 命中 RAG 关键词时先检索向量库再回答（复用 rag_search 底层逻辑）
+        question_text = classification.get("question_text", message)
+        try:
+            answer_llm = create_agent_llm(temperature=0.3)
+            current = await multi_agent_graph.aget_state(session.config)
+            report_ctx = ""
+            if current and current.values:
+                report_ctx = current.values.get("final_report", "") or ""
+            extra_response = await answer_with_rag(
+                question=question_text,
+                llm=answer_llm,
+                retriever=rag_retriever,
+                system_prompt_prefix=(
+                    "你是一个医疗器械文档审核专家。用户在多 Agent 协作审核过程中问了一个问题。\n"
+                    "请简洁回答（500字以内）。"
+                ),
+                report_context=report_ctx,
+            )
+            await session.queue.put({
+                "event": "agent_message",
+                "content": extra_response,
+                "intent": "question",
+            })
+        except Exception as e:
+            logger.warning(f"Multi-agent question answering failed: {e}")
+            await session.queue.put({
+                "event": "agent_message",
+                "content": f"抱歉，处理您的问题时出错: {e}",
+                "intent": "question",
+            })
+
+    elif intent == "adjust":
+        re_audit_sections = classification.get("re_audit_sections", [])
+        standard_override = classification.get("standard_override", "")
+        # 将 section_idx 映射为 chapter_idx
+        re_audit_chapters = []
+        if re_audit_sections:
+            current = await multi_agent_graph.aget_state(session.config)
+            chapter_structure = (
+                current.values.get("chapter_structure", []) if current and current.values else []
+            )
+            for chap in chapter_structure:
+                ch_idx = int(chap.get("chapter_idx", 0))
+                sub_indices = set(chap.get("subsection_indices", []) or [])
+                if any(s in sub_indices for s in re_audit_sections):
+                    re_audit_chapters.append(ch_idx)
+        if not re_audit_chapters:
+            # 无法映射时，按关键词提示用户
+            await session.queue.put({
+                "event": "agent_message",
+                "content": "未能识别需要重审的章节，请明确指定章节编号（如「重审第2章」）。",
+                "intent": "adjust",
+            })
+            # 仍 resume 让用户继续
+        else:
+            revision_requests = []
+            for ch_idx in re_audit_chapters:
+                revision_requests.append({
+                    "chapter_idx": ch_idx,
+                    "request": message,
+                    "standard_override": standard_override,
+                })
+            await multi_agent_graph.aupdate_state(
+                session.config,
+                {
+                    "re_audit_chapters": re_audit_chapters,
+                    "revision_requests": revision_requests,
+                    "user_feedback": message,
+                },
+            )
+
+    elif intent == "supplement":
+        supplement_text = classification.get("supplement_text", message)
+        current = await multi_agent_graph.aget_state(session.config)
+        existing_context = ""
+        if current and current.values:
+            existing_context = current.values.get("conversation_context", "")
+        new_context = (
+            f"{existing_context}\n[User Feedback]: {supplement_text}"
+            if existing_context
+            else f"[User Feedback]: {supplement_text}"
+        )
+        await multi_agent_graph.aupdate_state(
+            session.config,
+            {
+                "conversation_context": new_context[:8000],
+                "user_feedback": message,
+            },
+        )
+
+    elif intent == "skip":
+        skip_sections = classification.get("skip_sections", [])
+        # 映射为 chapter_idx
+        skip_chapters = []
+        if skip_sections:
+            current = await multi_agent_graph.aget_state(session.config)
+            chapter_structure = (
+                current.values.get("chapter_structure", []) if current and current.values else []
+            )
+            for chap in chapter_structure:
+                ch_idx = int(chap.get("chapter_idx", 0))
+                sub_indices = set(chap.get("subsection_indices", []) or [])
+                if any(s in sub_indices for s in skip_sections):
+                    skip_chapters.append(ch_idx)
+        await multi_agent_graph.aupdate_state(
+            session.config,
+            {
+                "skip_chapters": skip_chapters,
+                "user_feedback": message,
+            },
+        )
+
+    else:
+        # approve / regenerate — 直接 resume
+        pass
+
+    # 唤醒 persistent loop
+    session.pending_message = message
+    session.awaiting_input = False
+    session.resume_event.set()
+
+    return {
+        "session_id": session_id,
+        "intent": intent,
+        "status": "resumed",
+        "message": "消息已处理，Agent 恢复执行",
+        "extra_response": extra_response,
+    }
 
 
 @app.get("/api/multi-agent/conversation/stream/{session_id}")

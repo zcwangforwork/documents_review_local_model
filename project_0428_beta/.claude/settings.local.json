@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(E:/anaconda/anaconda_content/envs/env_01/python.exe:*)",
+      "Bash(curl -s -X POST \"http://localhost:8000/api/chat\" -H \"Content-Type: application/json\" -d @temp.json)",
+      "Bash(rm temp.json)",
+      "Bash(tasklist /FI \"IMAGENAME eq python.exe\")",
+      "Bash(netstat -ano)",
+      "mcp__MiniMax__web_search",
+      "Bash(taskkill //F //PID 25636)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:blog.csdn.net)",
+      "Bash(conda run:*)",
+      "Bash(PYTHONIOENCODING=utf-8 conda run:*)",
+      "Bash(curl:*)",
+      "Bash(tasklist:*)",
+      "Bash(taskkill:*)"
+    ]
+  },
+  "python.path": "E:/anaconda/anaconda_content/envs/env_01/python.exe"
+}

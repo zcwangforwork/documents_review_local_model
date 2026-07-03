@@ -3,6 +3,7 @@
 实现多轮审核流水线：章节分割 → 逐章并发审核 → 综合分析
 """
 import os
+import re
 import asyncio
 import json
 import logging
@@ -14,9 +15,37 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+# ============== LLM Listwise Reranking 配置（方案A）==============
+# 复用现有 qwen3.5:122b，对向量检索召回的候选片段做 listwise 重排
+RERANK_MODE = os.getenv("RERANK_MODE", "llm_listwise")  # llm_listwise | none
+RERANK_TOP_K = int(os.getenv("RERANK_TOP_K", "5"))            # 重排后最终返回数量
+RERANK_CANDIDATE_MULTIPLIER = int(os.getenv("RERANK_CANDIDATE_MULTIPLIER", "3"))  # 候选数 = top_k * 倍率
+RERANK_MAX_CANDIDATES = int(os.getenv("RERANK_MAX_CANDIDATES", "15"))             # 候选数上限
+RERANK_LLM_MIN_CANDIDATES = int(os.getenv("RERANK_LLM_MIN_CANDIDATES", "6"))      # 低于此数不触发 LLM 重排
+RERANK_TIMEOUT = float(os.getenv("RERANK_TIMEOUT", "5.0"))    # 单次重排 LLM 调用超时（秒）
+
 
 class RAGRetriever:
     """RAG 检索器，用于医疗器械体系文件审核"""
+
+    # ============== LLM Listwise Reranking Prompt（方案A）==============
+    # RankGPT 风格的 listwise 重排指令：给 LLM 一组候选片段，让它按与 query 的相关性输出排序后的序号
+    RERANK_LISTWISE_PROMPT = """你是一个专业的医疗器械法规知识库检索重排助手。
+我会给你一个查询（QUERY）和若干候选文档片段（每个片段有编号 [1]~[N]）。
+请根据每个片段与 QUERY 的**语义相关性**和**法规审核实用性**，从高到低对片段重新排序。
+
+判断相关性的依据：
+1. 片段内容是否能直接回答 QUERY 涉及的审核要点
+2. 片段是否包含与 QUERY 相关的法规条款、标准编号、具体要求
+3. 片段是否为医疗器械（尤其胰岛素泵）领域的体系文件/法规内容，而非无关通用文本
+4. 内容重复或过于宽泛的片段优先级降低
+
+输出格式（严格遵循，禁止输出任何其他内容）：
+<order> [编号1] > [编号2] > ... > [编号N] </order>
+
+示例：
+<order> [3] > [1] > [5] > [2] > [4] </order>
+"""
 
     # ============== 六大领域专项审核 Section Prompts ==============
 
@@ -1489,6 +1518,125 @@ class RAGRetriever:
         同步检索方法 — 供非异步上下文调用
         """
         return self._retrieve_for_section_sync(query, n_results=top_k)
+
+    @staticmethod
+    def _parse_ranking_response(text: str, n: int) -> Optional[List[int]]:
+        """从 LLM 重排响应中解析排序后的候选编号（1-based）。
+
+        期望格式: <order> [3] > [1] > [5] ... </order>
+        解析失败返回 None。
+        """
+        if not text:
+            return None
+        m = re.search(r"<order>(.*?)</order>", text, re.DOTALL)
+        body = m.group(1) if m else text
+        nums = [int(x) for x in re.findall(r"\[(\d+)\]", body)]
+        if not nums:
+            return None
+        # 去重保序，并裁剪到 n
+        seen = set()
+        ordered = []
+        for x in nums:
+            if 1 <= x <= n and x not in seen:
+                seen.add(x)
+                ordered.append(x)
+            if len(ordered) >= n:
+                break
+        # 若未能覆盖全部候选，视为格式不完整，返回 None 以触发回退
+        if len(ordered) < min(n, len(nums)):
+            return None
+        return ordered
+
+    def _llm_rerank_listwise_sync(self, query: str, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """同步调用 LLM 对候选片段做 listwise 重排（方案A）。
+
+        - 复用 self.api_url / self.api_key / self.model
+        - 使用 httpx.Client 同步阻塞调用，超时 RERANK_TIMEOUT 秒
+        - 任何异常/超时/格式错误均回退为原始顺序，绝不抛出
+        """
+        if not candidates:
+            return candidates
+        n = len(candidates)
+        # 候选数过少时直接返回，不值得调 LLM
+        if n < RERANK_LLM_MIN_CANDIDATES:
+            return candidates
+
+        # 构建候选片段展示文本（截断每个片段避免 prompt 过长）
+        parts = []
+        for i, doc in enumerate(candidates, 1):
+            text = (doc.get("text") or "").replace("\n", " ")[:300]
+            source = doc.get("source", "")
+            parts.append(f"[{i}] (来源: {source}) {text}")
+        user_content = (
+            f"QUERY: {query[:800]}\n\n"
+            f"候选片段（共 {n} 条）:\n" + "\n".join(parts) +
+            f"\n\n请按相关性从高到低输出排序，格式: <order> [编号] > [编号] > ... </order>"
+        )
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}",
+        }
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": self.RERANK_LISTWISE_PROMPT},
+                {"role": "user", "content": user_content},
+            ],
+            "temperature": 0.0,
+            "max_tokens": 512,
+        }
+
+        try:
+            with httpx.Client(timeout=RERANK_TIMEOUT, trust_env=False) as client:
+                resp = client.post(self.api_url, headers=headers, json=payload)
+                resp.raise_for_status()
+                result = resp.json()
+            choices = result.get("choices", [])
+            answer = choices[0].get("message", {}).get("content", "") if choices else ""
+        except Exception as e:
+            logger.info(f"Rerank LLM 调用失败，回退原始顺序: {e}")
+            return candidates
+
+        order = self._parse_ranking_response(answer, n)
+        if not order:
+            logger.info(f"Rerank 响应解析失败，回退原始顺序。原始响应: {answer[:200]}")
+            return candidates
+
+        reranked = [candidates[i - 1] for i in order]
+        # 补上未出现在排序中的候选（保底）
+        if len(reranked) < n:
+            seen = set(order)
+            for i in range(1, n + 1):
+                if i not in seen:
+                    reranked.append(candidates[i - 1])
+        logger.info(f"Rerank 完成: {n} 条候选 → 重排后取 {len(reranked)} 条")
+        return reranked
+
+    def search_sync_with_rerank(self, query: str, top_k: int = RERANK_TOP_K) -> List[Dict[str, Any]]:
+        """带 LLM listwise 重排的同步检索（方案A）。
+
+        流程:
+          1. 放宽召回数量（top_k * 倍率，上限 RERANK_MAX_CANDIDATES）从向量库取候选
+          2. 调用 _llm_rerank_listwise_sync 对候选重排
+          3. 截取 top_k 返回
+        任何重排失败均回退到原始向量检索顺序。
+        """
+        if RERANK_MODE == "none":
+            return self.search_sync(query, top_k=top_k)
+
+        candidate_k = min(top_k * RERANK_CANDIDATE_MULTIPLIER, RERANK_MAX_CANDIDATES)
+        candidates = self._retrieve_for_section_sync(query, n_results=candidate_k)
+        if not candidates:
+            return []
+
+        reranked = self._llm_rerank_listwise_sync(query, candidates)
+        return reranked[:top_k]
+
+    async def search_with_rerank(self, query: str, top_k: int = RERANK_TOP_K) -> List[Dict[str, Any]]:
+        """异步包装：带 LLM 重排的检索。"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.search_sync_with_rerank, query, top_k)
 
     async def _call_llm(self, system_prompt: str, user_content: str, max_tokens: int = 4000, temperature: float = 0.7) -> str:
         """
